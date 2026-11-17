@@ -180,18 +180,19 @@
                 const res = await window.n8nFetch('Check_login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ emp_id: empId, emp_pass: empPass })
+                    body: JSON.stringify({ username: empId, password: empPass })
                 });
 
-                const data = await res.json();
+                let data = await res.json();
+                if (Array.isArray(data)) data = data[0] || null;
 
-                if (res.ok && (data.success === true || data.status === 'success' || data.emp_id)) {
+                if (res.ok && data && (data.success === true || (data.emp_id && data.emp_id.trim() !== ''))) {
                     // บันทึก Session พื้นฐาน
                     sessionStorage.setItem('emp_id', data.emp_id || empId);
                     sessionStorage.setItem('name', data.emp_name || empId);
                     sessionStorage.setItem('email', data.emp_email || '');
                     sessionStorage.setItem('dep', data.emp_dep || 'KTW');
-                    sessionStorage.setItem('emp_type', data.emp_type ?? '0');
+                    sessionStorage.setItem('emp_type', String(data.emp_type ?? '0'));
 
                     // ดึงสิทธิ์ระบบอื่นๆ และ Permission กลาง
                     await Promise.all([
