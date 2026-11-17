@@ -1,0 +1,1338 @@
+﻿<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>สลับสินค้า - KTW Inventory System</title>
+    <!-- นำเข้าฟอนต์ Prompt เพื่อดีไซน์เรียบหรูเป็นทางการ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- นำเข้า Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- นำเข้า Lucide Icons สำหรับการใช้สัญลักษณ์ภาพ -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Prompt", "sans-serif"],
+            },
+            colors: {
+              brand: {
+                50: "#fff7ed",
+                100: "#ffedd5",
+                500: "#f97316", // สีส้มหลัก KTW
+                600: "#ea580c", // สีส้มเข้มตอน Hover
+                700: "#c2410c",
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      .modal-transition {
+        transition:
+          transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+          opacity 0.15s ease-out;
+      }
+
+      /* แถบเลื่อนสไตล์มินิมอล */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+
+      /* เมื่อสั่งพิมพ์ ให้แสดงเฉพาะเนื้อหาเอกสารใน #printArea เท่านั้น (คัดลอกมาจาก Preview ตอนกดปุ่มพิมพ์) */
+      @media print {
+        body > *:not(#printArea) {
+          display: none !important;
+        }
+
+        #printArea {
+          display: block !important;
+          position: static !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 24px !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+
+        /* ⚠️ กล่องความเห็นผู้อนุมัติใน Preview ไม่ต้องโชว์ตอนพิมพ์เอกสารจริง (ตามที่ตั้งใจไว้) */
+        .no-print {
+          display: none !important;
+        }
+      }
+    </style>
+    <script>
+      // ระบบตรวจสอบสิทธิ์ความปลอดภัย (Security Guard) — ย้ายมาไว้ที่ <head> เพื่อกันไม่ให้เนื้อหาแวบขึ้นมาก่อน redirect
+      // (เดิมอยู่ท้าย <body> ทำให้หน้าเว็บ render เนื้อหาทั้งหมดก่อนถึงจะเช็คสิทธิ์)
+      const currentEmpId = sessionStorage.getItem("emp_id");
+      const currentUserEmail = sessionStorage.getItem("email") || "";
+
+      if (!currentEmpId) {
+        try {
+          if (window.location.protocol === "blob:") {
+            console.warn(
+              "ตรวจพบการรันใน Sandbox ระบบทำการจำลองข้อมูลผู้ใช้ให้เรียบร้อยแล้ว",
+            );
+            sessionStorage.setItem("emp_id", "13125");
+            sessionStorage.setItem("name", "ธนกฤต (พรีวิวใน Canvas)");
+            sessionStorage.setItem("email", "tanakrit@ktw.co.th");
+            sessionStorage.setItem("dep", "SDT");
+            sessionStorage.setItem("emp_type", "1");
+          } else {
+            window.location.href = "../index.html";
+          }
+        } catch (e) {
+          console.error("ระบบรักษาความปลอดภัยขัดข้อง:", e);
+        }
+      }
+    </script>
+  </head>
+
+  <body
+    class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col md:flex-row antialiased"
+  >
+    <!-- แผงเมนูด้านซ้าย Sidebar (รองรับเฉพาะหน้าจอคอมพิวเตอร์ PC) -->
+    <aside
+      id="sidebar-container"
+      class="hidden md:block h-screen sticky top-0 shrink-0"
+    ></aside>
+
+    <!-- แท็บเมนูส่วนหัวด้านบนแบบ Responsive (แสดงเฉพาะในจอมือถือ Mobile เท่านั้น) -->
+    <header
+      class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50"
+    >
+      <div class="flex items-center gap-2">
+        <div
+          class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden"
+        >
+          <span class="text-white font-black text-[9px] tracking-tighter">KTW</span>
+        </div>
+        <h2 class="text-sm font-semibold text-slate-950">
+          KTW Inventory System
+        </h2>
+      </div>
+      <!-- ปุ่มเปิดเมนู Drawer บนมือถือ -->
+      <button
+        onclick="toggleMobileMenu()"
+        class="p-1 rounded-lg text-slate-600 hover:bg-slate-50"
+      >
+        <i id="mobileMenuBtn" data-lucide="menu" class="w-6 h-6"></i>
+      </button>
+    </header>
+
+    <!-- เมนูดึงลอยสไลด์ออกมาข้างจอ สำหรับโทรศัพท์มือถือ -->
+    <div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+      <div
+        onclick="toggleMobileMenu()"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+      ></div>
+      <div
+        class="fixed top-0 bottom-0 left-0 w-64 bg-white shadow-2xl flex flex-col"
+      >
+        <div id="mobile-sidebar-content" class="h-full"></div>
+      </div>
+    </div>
+
+    <!-- ส่วนเนื้อหาหลักภายนอก (Main Screen Content) -->
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
+      <!-- ส่วนหัวข้อหลักและการเรียกเปิดฟอร์มคืนสินค้า -->
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5"
+      >
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-slate-900">
+            การจัดการเอกสารใบสลับสินค้า
+          </h1>
+          <p class="text-sm text-slate-500">
+            สร้าง ตรวจสอบ และติดตามสถานะแบบฟอร์มใบขอสลับสินค้าภายในองกรค์
+          </p>
+        </div>
+        <!-- ปุ่มกดเพื่อเปิด Popup Modal แบบ Fullscreen -->
+        <button
+          id="btnNewDoc"
+          onclick="openNewSwapModal()"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium bg-brand-500 text-white hover:bg-brand-600 h-11 px-5 shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 active:scale-[0.98] transition-all self-start sm:self-center"
+        >
+          <i data-lucide="package-minus" class="w-4 h-4"></i>
+          สร้างใบขอสลับสินค้า
+        </button>
+      </div>
+
+      <!-- รายการใบงานที่เคยทำล่าสุด (ประวัติแบบเรียลไทม์ผ่าน localStorage) -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-slate-600">
+            ประวัติเอกสารใบสลับสินค้า
+          </h3>
+          <div class="flex items-center gap-3">
+            <button
+              onclick="resetHistoryFilters()"
+              id="resetHistoryFiltersBtn"
+              class="hidden text-xs font-semibold text-orange-600 hover:text-orange-700 inline-flex items-center gap-1 transition-colors"
+            >
+              <i data-lucide="x" class="w-3 h-3"></i>
+              ล้างตัวกรองทั้งหมด
+            </button>
+            <button
+              onclick="syncHistoryStatuses()"
+              id="syncHistoryBtn"
+              class="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-orange-600 transition-colors"
+            >
+              <i
+                data-lucide="refresh-cw"
+                class="w-3.5 h-3.5"
+                id="syncHistoryIcon"
+              ></i>
+              ซิงค์สถานะล่าสุด
+            </button>
+          </div>
+        </div>
+        <div
+          class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm"
+        >
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[900px]">
+              <thead>
+                <tr
+                  class="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500"
+                >
+                  <th class="p-4 w-44">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortHistoryBy('documentId')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>เลขที่เอกสาร</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="documentId"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="
+                          toggleHistoryFilterDropdown(event, 'documentId')
+                        "
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="documentId"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-40">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortHistoryBy('date')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>วันที่ทำรายการ</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="date"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleHistoryFilterDropdown(event, 'date')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="date"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-52">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortHistoryBy('purpose')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>วัตถุประสงค์</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="purpose"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleHistoryFilterDropdown(event, 'purpose')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="purpose"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-36">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortHistoryBy('createdByEmpId')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span class="whitespace-nowrap">รหัสพนักงาน</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="createdByEmpId"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="
+                          toggleHistoryFilterDropdown(event, 'createdByEmpId')
+                        "
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="createdByEmpId"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortHistoryBy('preparedBy')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>ผู้สลับสินค้า</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="preparedBy"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="
+                          toggleHistoryFilterDropdown(event, 'preparedBy')
+                        "
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="preparedBy"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-56">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortHistoryBy('displayStatus')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>สถานะ</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="displayStatus"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="
+                          toggleHistoryFilterDropdown(event, 'displayStatus')
+                        "
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="displayStatus"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 text-right w-32">การจัดการเอกสาร</th>
+                </tr>
+              </thead>
+              <tbody
+                id="historyTableBody"
+                class="divide-y divide-slate-100 text-sm"
+              >
+                <!-- แถวประวัติสลับสินค้าจะเรนเดอร์แบบ Dynamic ที่นี่ -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Dropdown Filter ของแต่ละคอลัมน์ในตารางประวัติเอกสาร -->
+    <!-- ใช้ position:fixed และวางไว้นอก .overflow-hidden/.overflow-x-auto ของการ์ดตาราง ป้องกันไม่ให้ถูกตัดขอบ -->
+    <div
+      id="filter-dropdown-documentId"
+      class="history-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >ค้นหาเลขที่ใบงาน</label
+      >
+      <input
+        type="text"
+        id="filter-documentId"
+        oninput="onHistoryFilterChange()"
+        placeholder="พิมพ์เพื่อค้นหา..."
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      />
+    </div>
+    <div
+      id="filter-dropdown-date"
+      class="history-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >เลือกวันที่</label
+      >
+      <input
+        type="date"
+        id="filter-date"
+        onchange="
+          onHistoryFilterChange();
+          closeAllHistoryFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      />
+    </div>
+    <div
+      id="filter-dropdown-purpose"
+      class="history-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-52 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >วัตถุประสงค์ (mov.type)</label
+      >
+      <select
+        id="filter-purpose"
+        onchange="
+          onHistoryFilterChange();
+          closeAllHistoryFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
+    <div
+      id="filter-dropdown-preparedBy"
+      class="history-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-52 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >ผู้สลับสินค้า</label
+      >
+      <select
+        id="filter-preparedBy"
+        onchange="
+          onHistoryFilterChange();
+          closeAllHistoryFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
+    <div
+      id="filter-dropdown-createdByEmpId"
+      class="history-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-52 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >รหัสพนักงาน</label
+      >
+      <select
+        id="filter-createdByEmpId"
+        onchange="
+          onHistoryFilterChange();
+          closeAllHistoryFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
+    <div
+      id="filter-dropdown-displayStatus"
+      class="history-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >สถานะ</label
+      >
+      <select
+        id="filter-displayStatus"
+        onchange="
+          onHistoryFilterChange();
+          closeAllHistoryFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+        <option value="รอ ผู้บริหาร อนุมัติ">รอ ผู้บริหาร อนุมัติ</option>
+        <option value="รอ SCM อนุมัติ">รอ SCM อนุมัติ</option>
+        <option value="อนุมัติแล้ว">อนุมัติแล้ว</option>
+        <option value="ถูกปฏิเสธ">ถูกปฏิเสธ</option>
+      </select>
+    </div>
+
+    <!-- Dropdown ผลลัพธ์ Autocomplete รหัสสินค้า (ใช้ร่วมกันทุกแถวในตาราง วางตำแหน่งด้วย position:fixed ใต้ช่องที่กำลังพิมพ์อยู่) -->
+    <div
+      id="prodAutocompleteDropdown"
+      class="hidden fixed z-[100] bg-white border border-slate-200 rounded-xl shadow-xl overflow-y-auto text-xs"
+      style="width: 320px; max-height: 280px"
+    ></div>
+
+    <!-- ========================================== -->
+    <!-- POPUP MODAL FULLSCREEN (ฟอร์มขอคืน/สลับสินค้า) -->
+    <!-- ========================================== -->
+    <div
+      id="swapFullscreenModal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/50 backdrop-blur-xs"
+    >
+      <div
+        id="swapModalContent"
+        class="modal-transition scale-95 opacity-0 bg-white rounded-2xl shadow-2xl w-full max-w-[96vw] max-h-[92vh] flex flex-col"
+      >
+        <!-- ส่วนหัวของโมดอล -->
+        <div
+          class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0"
+        >
+          <div>
+            <h2 id="formModalTitle" class="text-lg font-bold text-slate-900">
+              สร้างคำขออนุมัติเอกสารสลับสินค้า
+            </h2>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+              F-14-E05 แก้ไขครั้งที่ 01 · Movement Type 309, 921, 922
+              <span
+                id="formModeBadge"
+                class="text-brand-600 font-medium"
+              ></span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onclick="closeSwapModal()"
+            class="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- ส่วนกรอกข้อมูลฟอร์มหลัก (scroll ได้ ส่วน footer อยู่นอก form แต่ผูกด้วย form="swapForm") -->
+        <form
+          id="swapForm"
+          onsubmit="submitSwapForm(event)"
+          class="overflow-y-auto px-6 py-5 space-y-6"
+        >
+          <!-- แถวที่ 1: Document ID | วันที่ | วัตถุประสงค์ -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label
+                for="docId"
+                class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >Document ID</label
+              >
+              <input
+                type="text"
+                id="docId"
+                readonly
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm font-mono cursor-not-allowed outline-none"
+              />
+            </div>
+            <div>
+              <label
+                for="docDate"
+                class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >วันที่ (Date)</label
+              >
+              <input
+                type="date"
+                id="docDate"
+                readonly
+                required
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm cursor-not-allowed outline-none pointer-events-none"
+              />
+              <p class="text-[10px] text-slate-400 mt-1">
+                วันที่ปัจจุบันถูกล็อกโดยระบบอัตโนมัติ
+              </p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >วัตถุประสงค์ (Movement Type)</label
+              >
+              <div
+                class="flex flex-wrap items-center gap-x-4 gap-y-1.5 min-h-10 py-1"
+                id="purposeRadioGroup"
+              >
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="purpose"
+                    value="309"
+                    checked
+                    class="accent-brand-500"
+                  />
+                  309 : สลับสินค้ารุ่น
+                </label>
+                <!-- 921-922 รวมเป็นตัวเลือกเดียว (หน้างานตกลง 21/09/2026) — บันทึกลง movement_type = "921-922" -->
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="purpose"
+                    value="921-922"
+                    class="accent-brand-500"
+                  />
+                  921-922 : สลับสินค้ารุ่นเข้า/ออก
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- ================= เอกสารแนบ + ข้ามขั้นตอนผู้บริหาร ================= -->
+          <div
+            class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+          >
+            <div
+              class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+            >
+              <i data-lucide="paperclip" class="w-3.5 h-3.5 text-brand-500"></i>
+              เอกสารแนบประกอบ
+            </div>
+
+            <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="hasAttachmentRadio"
+                  value="0"
+                  checked
+                  onchange="onAttachmentToggle(false)"
+                  class="accent-brand-500"
+                />
+                <span>ไม่มีเอกสารแนบ</span>
+              </label>
+              <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                <input
+                  type="radio"
+                  name="hasAttachmentRadio"
+                  value="1"
+                  onchange="onAttachmentToggle(true)"
+                  class="accent-brand-500"
+                />
+                <span>มีเอกสารแนบ</span>
+              </label>
+            </div>
+
+            <!-- ช่องอัปโหลดไฟล์ — โชว์เฉพาะเมื่อเลือก "มีเอกสารแนบ" -->
+            <div id="attachmentBox" class="hidden space-y-2">
+              <input
+                type="file"
+                id="attachmentFile"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onchange="onAttachmentFileChange(this)"
+                class="w-full text-sm file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+              />
+              <p id="attachmentFileHint" class="text-[11px] text-slate-400">
+                รองรับ PDF / JPG / PNG ขนาดไม่เกิน 5 MB
+              </p>
+              <div
+                id="attachmentCurrentInfo"
+                class="hidden text-xs text-emerald-600 flex items-center gap-1"
+              >
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                <span id="attachmentCurrentName"></span>
+              </div>
+              <!-- ปุ่มเปิด/ดาวน์โหลดไฟล์เดิม — โชว์เฉพาะเอกสารที่ดึงมาจาก SQL แล้วมีไฟล์แนบอยู่ -->
+              <div id="attachmentExistingActions" class="hidden flex items-center gap-2">
+                <button
+                  type="button"
+                  onclick="openExistingAttachment()"
+                  class="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors flex items-center gap-1"
+                >
+                  <i data-lucide="external-link" class="w-3 h-3"></i>เปิดดูไฟล์แนบ
+                </button>
+                <button
+                  type="button"
+                  onclick="downloadExistingAttachment()"
+                  class="px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors flex items-center gap-1"
+                >
+                  <i data-lucide="download" class="w-3 h-3"></i>ดาวน์โหลด
+                </button>
+              </div>
+            </div>
+
+            <!-- Fast-track — เปิดใช้ได้เฉพาะเมื่อมีเอกสารแนบเท่านั้น -->
+            <div class="pt-2 border-t border-slate-200">
+              <label
+                id="skipApproverLabel"
+                class="flex items-start gap-2 text-sm cursor-not-allowed opacity-50"
+              >
+                <input
+                  type="checkbox"
+                  id="skipApprover"
+                  disabled
+                  class="mt-0.5 accent-brand-500"
+                />
+                <span>
+                  <span class="font-medium text-slate-700"
+                    >ไม่ผ่านผู้บริหาร (ส่งตรงไปยังขั้นตอนถัดไปทันที)</span
+                  >
+                  <span
+                    id="skipApproverHint"
+                    class="block text-[11px] text-slate-400 mt-0.5"
+                    >ต้องแนบเอกสารประกอบก่อนจึงจะเลือกได้</span
+                  >
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- แถวที่ 2: Document Status (แคบ) | หมายเหตุ (กว้าง) -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label
+                for="docStatus"
+                class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >Document Status</label
+              >
+              <select
+                id="docStatus"
+                disabled
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm cursor-not-allowed outline-none appearance-none"
+              >
+                <option value="รอการอนุมัติ" selected>รอการอนุมัติ</option>
+                <option value="อนุมัติแล้ว">อนุมัติแล้ว</option>
+                <option value="ยกเลิก">ยกเลิก</option>
+                <option value="เสร็จสิ้น">เสร็จสิ้น</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2">
+              <label
+                for="remark"
+                class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >หมายเหตุ (Remark)</label
+              >
+              <input
+                type="text"
+                id="remark"
+                placeholder="ระบุรายละเอียดเพิ่มเติม หรือหมายเหตุ (ถ้ามี)"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <!-- แถวที่ 3: รายการสินค้า -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-slate-500"
+                >รายการสินค้าและจำนวนที่ต้องการเบิกสลับ</label
+              >
+              <button
+                type="button"
+                id="addNewRowBtn"
+                onclick="addProductRow()"
+                class="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1"
+              >
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                เพิ่มแถวสินค้าใหม่
+              </button>
+            </div>
+            <div class="border border-slate-200 rounded-xl overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[1000px]">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-10 text-center"
+                      >
+                        No.
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-44 text-center"
+                      >
+                        รหัสสินค้า (Prod.Code)
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-44 text-center"
+                      >
+                        รายละเอียดสินค้า
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-28 text-center"
+                      >
+                        จำนวนเข้า
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-28 text-center"
+                      >
+                        หน่วยเข้า
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-28 text-center"
+                      >
+                        จำนวนออก
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-28 text-center"
+                      >
+                        หน่วยออก
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-32 text-center"
+                      >
+                        ราคา/หน่วย
+                      </th>
+                      <th class="px-2 py-2 w-10" id="manageColHeader"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="productTableBody">
+                    <!-- แถวรายการสินค้าจะถูกเพิ่มแบบ Dynamic ผ่าน JavaScript -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- แถวที่ 4: ผู้ลงนามและผู้เกี่ยวข้อง — 3 กล่องขนาดเท่ากัน จัดวางแบบสมมาตร (เหมือนระบบ NCR) -->
+          <div class="space-y-3 pt-2">
+            <label class="text-xs font-semibold text-slate-500"
+              >ผู้ลงนามและผู้เกี่ยวข้อง</label
+            >
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- ผู้ขอสลับสินค้า -->
+              <div
+                class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+              >
+                <div
+                  class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+                >
+                  <i
+                    data-lucide="user-cog"
+                    class="w-3.5 h-3.5 text-brand-500"
+                  ></i>
+                  ผู้ขออนุมัติสลับสินค้า
+                </div>
+                <div>
+                  <label
+                    for="preparedBy"
+                    class="block text-[11px] text-slate-400 mb-1"
+                    >ชื่อ-นามสกุล</label
+                  >
+                  <input
+                    type="text"
+                    id="preparedBy"
+                    required
+                    placeholder="ระบุผู้รับผิดชอบการสลับ"
+                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                  <p
+                    id="preparedByLockHint"
+                    class="hidden text-[10px] text-slate-400 mt-1"
+                  >
+                    ไม่สามารถแก้ไขได้ตอนแก้ไขเอกสาร (คงข้อมูลผู้สร้างเดิมไว้)
+                  </p>
+                </div>
+                <div>
+                  <label
+                    for="preparedByEmail"
+                    class="block text-[11px] text-slate-400 mb-1"
+                    >Email</label
+                  >
+                  <input
+                    type="email"
+                    id="preparedByEmail"
+                    required
+                    placeholder="example@ktw.co.th"
+                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <!-- SCM ส่วนงาน Inventory Control -->
+              <div
+                class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+              >
+                <div
+                  class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+                >
+                  <i
+                    data-lucide="shield-check"
+                    class="w-3.5 h-3.5 text-brand-500"
+                  ></i>
+                  เจ้าหน้าที่ แผนก SCM
+                </div>
+                <div>
+                  <label
+                    for="scmControl"
+                    class="block text-[11px] text-slate-400 mb-1"
+                    >ชื่อ-นามสกุล</label
+                  >
+                  <select
+                    id="scmControl"
+                    required
+                    onchange="autoFillContactEmail(this, 'scmControlEmail', 'scmControlEmpId', 'scm')"
+                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  >
+                    <option value="">-- เลือกชื่อ --</option>
+                  </select>
+                  <input type="hidden" id="scmControlEmpId" />
+                </div>
+                <div>
+                  <label
+                    for="scmControlEmail"
+                    class="block text-[11px] text-slate-400 mb-1"
+                    >Email (ส่งแจ้งให้เข้ามาอนุมัติ)</label
+                  >
+                  <input
+                    type="email"
+                    id="scmControlEmail"
+                    required
+                    value="khemjira@ktw.co.th"
+                    placeholder="scm@ktw.co.th"
+                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+                <!-- พื้นที่แสดงลายเซ็นจริงของ SCM (โชว์เฉพาะตอนดึงข้อมูลมาแล้วมีลายเซ็นบันทึกไว้) -->
+                <div id="scmSignatureBox" class="hidden space-y-1">
+                  <label class="block text-[11px] text-slate-400"
+                    >ลายเซ็นที่ SCM ลงนามไว้</label
+                  >
+                  <div
+                    class="bg-white border-2 border-dashed border-emerald-200 rounded-lg p-1.5"
+                  >
+                    <img
+                      id="scmSignatureImage"
+                      src=""
+                      alt="ลายเซ็น SCM"
+                      class="max-h-16 mx-auto"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- ผู้อนุมัติสลับสินค้า -->
+              <div
+                class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+              >
+                <div
+                  class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+                >
+                  <i
+                    data-lucide="shield-check"
+                    class="w-3.5 h-3.5 text-brand-500"
+                  ></i>
+                  ผู้บริหาร
+                </div>
+                <div>
+                  <label
+                    for="approvedBy"
+                    class="block text-[11px] text-slate-400 mb-1"
+                    >ชื่อ-นามสกุล</label
+                  >
+                  <select
+                    id="approvedBy"
+                    required
+                    onchange="autoFillContactEmail(this, 'approvedByEmail', 'approvedByEmpId', 'approver')"
+                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  >
+                    <option value="">-- เลือกชื่อ --</option>
+                  </select>
+                  <input type="hidden" id="approvedByEmpId" />
+                </div>
+                <div>
+                  <label
+                    for="approvedByEmail"
+                    class="block text-[11px] text-slate-400 mb-1"
+                    >Email (ส่งแจ้งให้เข้ามาอนุมัติ)</label
+                  >
+                  <input
+                    type="email"
+                    id="approvedByEmail"
+                    required
+                    value="kamolchai@ktw.co.th"
+                    placeholder="approver@ktw.co.th"
+                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                  />
+                </div>
+                <!-- พื้นที่แสดงลายเซ็นจริงของผู้บริหาร (โชว์เฉพาะตอนดึงข้อมูลมาแล้วมีลายเซ็นบันทึกไว้) -->
+                <div id="approvedSignatureBox" class="hidden space-y-1">
+                  <label class="block text-[11px] text-slate-400"
+                    >ลายเซ็นที่ผู้บริหารลงนามไว้</label
+                  >
+                  <div
+                    class="bg-white border-2 border-dashed border-emerald-200 rounded-lg p-1.5"
+                  >
+                    <img
+                      id="approvedSignatureImage"
+                      src=""
+                      alt="ลายเซ็นผู้บริหาร"
+                      class="max-h-16 mx-auto"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <!-- แถบด้านล่างปุ่มกดการจัดการ (นอก form แต่ผูก submit ผ่าน form="swapForm") -->
+        <div
+          class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 shrink-0"
+        >
+          <button
+            type="button"
+            onclick="closeSwapModal()"
+            class="h-10 px-4 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="submit"
+            form="swapForm"
+            id="submitBtn"
+            class="h-10 px-5 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-600 shadow-md shadow-brand-500/10 flex items-center gap-2 disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span id="submitBtnText">บันทึกเอกสาร</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL DOCFLOW (เส้นทางการเดินเอกสาร) -->
+    <!-- ========================================== -->
+    <div
+      id="docFlowModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300"
+        id="docFlowModalContent"
+      >
+        <!-- Header -->
+        <div
+          class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between"
+        >
+          <div class="flex items-center gap-2">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-white shadow-xs"
+            >
+              <i data-lucide="git-branch" class="w-4 h-4"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-950">
+              เส้นทางการเดินเอกสาร (Docflow)
+            </h3>
+          </div>
+          <button
+            onclick="closeDocFlowModal()"
+            class="text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Timeline Content -->
+        <div class="p-6 space-y-6 flex-1 min-h-0 overflow-y-auto" id="docFlowContent">
+          <!-- ข้อมูลประวัติการส่งต่อเอกสารแบบ Dynamic -->
+        </div>
+
+        <!-- Footer -->
+        <div
+          class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end"
+        >
+          <button
+            onclick="closeDocFlowModal()"
+            class="h-10 px-5 rounded-xl text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors"
+          >
+            ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL PREVIEW เอกสาร (ดูตัวอย่างหน้าตาเอกสารจริงก่อนพิมพ์) -->
+    <!-- ========================================== -->
+    <div
+      id="previewDocModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4"
+    >
+      <div
+        class="bg-slate-200 rounded-2xl w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300 flex flex-col"
+        style="max-width: 1400px; width: 94vw; max-height: 92vh"
+        id="previewDocModalContent"
+      >
+        <!-- แถบหัวโมดอล (ไม่พิมพ์ออกมา) -->
+        <div
+          class="print:hidden flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0"
+        >
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-brand-500"></i>
+            <h3 class="text-sm font-bold text-slate-950">
+              ตัวอย่างเอกสาร (Preview)
+            </h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              onclick="printPreviewDocument()"
+              class="h-9 px-3.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5"
+            >
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              พิมพ์เอกสาร
+            </button>
+            <button
+              onclick="closePreviewDocModal()"
+              class="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 flex items-center justify-center transition-colors"
+            >
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+        <!-- เนื้อหาเอกสาร (สไตล์กระดาษ A4 จำลอง เต็มความกว้างกรอบ) -->
+        <div class="overflow-y-auto flex-1 p-5 sm:p-8">
+          <div
+            id="previewDocPaper"
+            class="bg-white w-full p-10 sm:p-14 shadow-sm border border-slate-200 text-slate-800 text-base"
+          ></div>
+          <!-- 📎 แถบไฟล์แนบ — วางใต้กระดาษและมี print:hidden เพื่อไม่ให้ปนไปกับฟอร์มตอนสั่งพิมพ์ -->
+          <div
+            id="previewAttachmentBar"
+            class="print:hidden hidden mt-4 bg-white rounded-xl border border-slate-200 p-4"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL CONFIRM DELETE (ยืนยันการลบเอกสาร) -->
+    <!-- ========================================== -->
+    <div
+      id="deleteDocModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300"
+        id="deleteDocModalContent"
+      >
+        <div class="p-6 text-center space-y-4">
+          <div
+            class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50 text-red-600 border border-red-100"
+          >
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-950">
+              ยืนยันการลบใบสลับสินค้า
+            </h3>
+            <p class="text-xs text-slate-500 mt-2">
+              คุณแน่ใจหรือไม่ที่จะลบเอกสารเลขที่
+              <strong
+                id="deleteDocIdDisplay"
+                class="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded"
+              ></strong>
+              ออกจากระบบการทำงาน? การดำเนินการนี้ไม่สามารถย้อนกลับได้
+            </p>
+          </div>
+          <div class="flex items-center justify-center gap-2 pt-2">
+            <button
+              onclick="closeDeleteDocModal()"
+              class="h-10 px-4 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              ยกเลิก
+            </button>
+            <button
+              id="confirmDeleteDocBtn"
+              class="h-10 px-5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors"
+            >
+              ยืนยันการลบ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 🆕 30/09/2569 : MODAL ถอยสถานะเอกสาร (Admin + SCM) -->
+    <!-- ========================================== -->
+    <div
+      id="adminRevertSwapModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300"
+        id="adminRevertSwapModalContent"
+      >
+        <div class="px-6 py-5 space-y-4">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 border border-amber-100"
+            >
+              <i data-lucide="undo-2" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-950">ถอยสถานะเอกสาร (Admin/SCM)</h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                เลขที่เอกสาร
+                <strong
+                  id="adminRevertSwapDocIdDisplay"
+                  class="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded"
+                ></strong>
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="text-xs font-semibold text-slate-700">ถอยกลับไปขั้น</label>
+            <label class="flex items-start gap-2 text-xs text-slate-700 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="adminRevertSwapTargetStage" value="waiting" class="mt-0.5" onchange="toggleAdminRevertSwapFastTrackOption()" checked>
+              <span>รอผู้บริหารอนุมัติ (ล้างการอนุมัติผู้บริหาร + SCM ทั้งหมด กลับไปจุดเริ่มต้น)</span>
+            </label>
+            <label class="flex items-start gap-2 text-xs text-slate-700 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer">
+              <input type="radio" name="adminRevertSwapTargetStage" value="scm" class="mt-0.5" onchange="toggleAdminRevertSwapFastTrackOption()">
+              <span>รอ SCM อนุมัติ (คงการอนุมัติผู้บริหารไว้ ล้างเฉพาะการอนุมัติของ SCM — ใช้เมื่อ SCM กดอนุมัติผิดขั้นเท่านั้น)</span>
+            </label>
+          </div>
+
+          <label id="adminRevertSwapFastTrackWrap" class="flex items-start gap-2 text-xs text-slate-600 pl-1">
+            <input type="checkbox" id="adminRevertSwapResetFastTrack" class="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+            <span>รีเซ็ต "ไม่ผ่านผู้บริหาร (Fast Track)" ด้วย — ใช้เมื่อหน้างานติ๊ก Fast Track มาผิด ต้องการให้เอกสารกลับไปรอผู้บริหารอนุมัติตามปกติ</span>
+          </label>
+
+          <div>
+            <label for="adminRevertSwapReason" class="text-xs font-semibold text-slate-700">เหตุผลที่ถอยสถานะ <span class="text-red-500">*</span></label>
+            <textarea
+              id="adminRevertSwapReason"
+              rows="2"
+              class="mt-1 w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+              placeholder="เช่น หน้างานระบุ Fast Track มาผิด ต้องการให้กลับไปผ่านผู้บริหารอนุมัติตามปกติ"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-1">
+            <button
+              onclick="closeAdminRevertSwapModal()"
+              class="h-10 px-4 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              ยกเลิก
+            </button>
+            <button
+              id="confirmAdminRevertSwapBtn"
+              class="h-10 px-5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+            >
+              ยืนยันถอยสถานะ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 🆕 06/10/2569 : MODAL ยกเลิกเอกสาร (ผู้สร้าง / Admin) -->
+    <!-- ========================================== -->
+    <div
+      id="cancelDocModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300"
+        id="cancelDocModalContent"
+      >
+        <div class="px-6 py-5 space-y-4">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-600 border border-orange-100"
+            >
+              <i data-lucide="ban" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-950">ยกเลิกเอกสารสลับสินค้า</h3>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                เลขที่เอกสาร
+                <strong
+                  id="cancelDocIdDisplay"
+                  class="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded"
+                ></strong>
+              </p>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-600 leading-relaxed">
+            เอกสารที่ยกเลิกแล้วจะไม่เข้าคิวอนุมัติและไม่สามารถแก้ไข ลบ หรือยกเลิกการยกเลิกได้อีก
+            และระบบจะ<strong>ไม่ส่งอีเมล</strong>แจ้งผู้ใด
+          </p>
+
+          <div>
+            <label for="cancelDocReason" class="text-xs font-semibold text-slate-700">เหตุผลที่ยกเลิก <span class="text-red-500">*</span></label>
+            <textarea
+              id="cancelDocReason"
+              rows="2"
+              maxlength="500"
+              class="mt-1 w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              placeholder="เช่น สร้างเอกสารซ้ำ / ระบุรายการสินค้าผิด จะสร้างใบใหม่แทน"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-1">
+            <button
+              onclick="closeCancelDocModal()"
+              class="h-10 px-4 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              ปิด
+            </button>
+            <button
+              id="confirmCancelDocBtn"
+              class="h-10 px-5 rounded-xl text-xs font-semibold bg-orange-600 hover:bg-orange-700 text-white transition-colors"
+            >
+              ยืนยันยกเลิกเอกสาร
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- แท่น Toast Notification -->
+    <div
+      id="toast-container"
+      class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none"
+    ></div>
+
+    <!-- แกนกลางระบบ KTW HUB -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- โมดูล Service ของระบบ SWAP Product (Logic แยกจาก HTML) -->
+    <script src="../modules/swapService.js"></script>
+    <!-- พื้นที่สำหรับพิมพ์เอกสารโดยเฉพาะ (คัดลอกเนื้อหาจาก Preview มาวางตอนกดปุ่มพิมพ์ - ซ่อนอยู่ตลอดเวลายกเว้นตอนสั่งพิมพ์) -->
+    <div
+      id="printArea"
+      class="hidden bg-white text-slate-800 text-[15px]"
+    ></div>
+  </body>
+</html>

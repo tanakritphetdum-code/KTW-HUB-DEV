@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KTW HUB — ศูนย์รวมระบบบริการองค์กร</title>
+    <!-- Prompt Font & Tailwind CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex antialiased">
+    <!-- โหลดแกนกลางและระบบแคช -->
+    <script src="version.js"></script>
+    <script src="shared/config.js"></script>
+    <script src="shared/devBanner.js"></script>
+    <script src="shared/api.js"></script>
+    <script src="shared/perm.js"></script>
+    <script src="shared/menu.js"></script>
+
+    <!-- Sidebar ส่วนกลาง -->
+    <div id="sidebar-container"></div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        <!-- Top App Bar -->
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+            <div>
+                <h2 class="text-xl font-bold text-slate-800">ศูนย์รวมระบบงาน (KTW HUB)</h2>
+                <p class="text-xs text-slate-400 mt-0.5">เลือกเมนูหรือระบบงานที่ท่านต้องการดำเนินการ</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="welcome-badge" class="px-3 py-1 bg-orange-50 text-orange-600 rounded-full text-xs font-semibold border border-orange-100 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                    <span id="user-display">ผู้ใช้งาน</span>
+                </span>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="p-6 sm:p-8 max-w-7xl mx-auto w-full space-y-8">
+            
+            <!-- Hero Greeting Banner -->
+            <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-6 sm:p-8 text-white shadow-lg shadow-orange-500/15 relative overflow-hidden">
+                <div class="relative z-10 space-y-2">
+                    <h3 class="text-2xl sm:text-3xl font-extrabold tracking-tight">ยินดีต้อนรับสู่ KTW HUB</h3>
+                    <p class="text-orange-100 text-sm sm:text-base max-w-2xl">
+                        พอร์ทัลกลางสำหรับจัดการงานคลังสินค้า อะไหล่ งานเคลม และเอกสารอนุมัติภายในองค์กร ทำงานร่วมกับระบบหลังบ้านอัตโนมัติ
+                    </p>
+                </div>
+                <!-- Background decoration icon -->
+                <i data-lucide="layers" class="absolute -right-6 -bottom-6 w-44 h-44 text-white/10 pointer-events-none"></i>
+            </div>
+
+            <!-- Dynamic System Cards Section -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-base font-bold text-slate-800">ระบบงานที่ท่านมีสิทธิ์เข้าถึง</h4>
+                        <p class="text-xs text-slate-400">ระบบจะแสดงเฉพาะฟังก์ชันที่เปิดให้ท่านใช้งานตามสิทธิ์ในระบบ</p>
+                    </div>
+                </div>
+
+                <!-- การ์ดจะถูกวาดลงในกริดนี้แบบ Dynamic อัตโนมัติจาก SYSTEM_MODULES -->
+                <div id="module-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <!-- Cards will be injected by JavaScript -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            // ตรวจสอบสถานะการเข้าสู่ระบบ
+            const empId = sessionStorage.getItem('emp_id');
+            const empName = sessionStorage.getItem('name');
+            if (!empId) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.getElementById('user-display').textContent = `${empName || empId} (${sessionStorage.getItem('dep') || 'KTW'})`;
+
+            // โหลดสิทธิ์ละเอียดจาก Permission API (ถ้ามี)
+            if (window.KTWPerm) {
+                await window.KTWPerm.load();
+            }
+
+            // วาด Sidebar
+            if (window.renderSidebar) {
+                window.renderSidebar();
+            }
+
+            // วาดการ์ดระบบงานแบบ Dynamic
+            renderDynamicCards();
+        });
+
+        function renderDynamicCards() {
+            const grid = document.getElementById('module-grid');
+            if (!grid || !window.SYSTEM_MODULES) return;
+
+            const P = window.KTWPerm;
+            const permOn = !!(P && P.isReady());
+
+            // 1. การ์ดระบบย่อยทั้งหมด
+            const availableModules = window.SYSTEM_MODULES.filter(mod => {
+                const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
+                if (permOn) return P.can(mod.permKey, 'VIEW_MENU');
+                return !mod.navVisibleRoles || mod.navVisibleRoles.includes(role);
+            });
+
+            let cardsHTML = availableModules.map(mod => {
+                const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
+                const roleLabel = mod.roleLabels[role] || 'ผู้ใช้งาน';
+                const targetLink = `pages/${mod.nav.file}`;
+
+                return `
+                    <div class="bg-white border border-slate-200/80 rounded-2xl p-5 hover:border-orange-300 hover:shadow-xl hover:shadow-orange-500/5 transition-all flex flex-col justify-between group">
+                        <div class="space-y-3">
+                            <div class="flex items-start justify-between">
+                                <div class="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center group-hover:scale-105 group-hover:bg-orange-500 group-hover:text-white transition-all shadow-sm">
+                                    <i data-lucide="${mod.nav.icon}" class="w-6 h-6"></i>
+                                </div>
+                                <span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-medium">
+                                    ${roleLabel}
+                                </span>
+                            </div>
+                            <div>
+                                <h5 class="text-base font-bold text-slate-800 group-hover:text-orange-600 transition-colors">${mod.name}</h5>
+                                <p class="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">${mod.desc}</p>
+                            </div>
+                        </div>
+                        <div class="pt-5 mt-4 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs font-semibold text-orange-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                เข้าสู่ระบบ <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </span>
+                            <a href="${targetLink}" class="absolute inset-0 z-10" aria-label="${mod.name}"></a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 2. การ์ดการอนุมัติเอกสาร (ถ้ามีสิทธิ์)
+            const canApproveAny = permOn 
+                ? P.can('PORTAL', 'MENU_APPROVE') 
+                : window.SYSTEM_MODULES.some(m => m.canApprove(sessionStorage.getItem(m.sessionRoleKey) || '0'));
+
+            if (canApproveAny) {
+                cardsHTML = `
+                    <div class="bg-gradient-to-br from-white to-orange-50/40 border border-orange-200 rounded-2xl p-5 hover:shadow-xl hover:shadow-orange-500/10 transition-all flex flex-col justify-between group relative overflow-hidden">
+                        <div class="space-y-3 relative z-10">
+                            <div class="flex items-start justify-between">
+                                <div class="w-12 h-12 rounded-xl bg-orange-500 text-white flex items-center justify-center group-hover:scale-105 transition-all shadow-md shadow-orange-500/20">
+                                    <i data-lucide="file-check-2" class="w-6 h-6"></i>
+                                </div>
+                                <span class="px-2.5 py-1 bg-orange-100 text-orange-700 rounded-lg text-[11px] font-bold">
+                                    ศูนย์กลางอนุมัติ
+                                </span>
+                            </div>
+                            <div>
+                                <h5 class="text-base font-bold text-slate-900 group-hover:text-orange-600 transition-colors">การอนุมัติเอกสาร (Approve Hub)</h5>
+                                <p class="text-xs text-slate-600 mt-1 leading-relaxed">ตรวจสอบ พิจารณา และอนุมัติเอกสารทุกระบบที่รอคิวของท่าน</p>
+                            </div>
+                        </div>
+                        <div class="pt-5 mt-4 border-t border-orange-100 flex items-center justify-between relative z-10">
+                            <span class="text-xs font-bold text-orange-600 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                                เปิดคิวอนุมัติ <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                            </span>
+                            <a href="pages/approve.html" class="absolute inset-0 z-20" aria-label="การอนุมัติเอกสาร"></a>
+                        </div>
+                    </div>
+                ` + cardsHTML;
+            }
+
+            grid.innerHTML = cardsHTML;
+            if (window.lucide) window.lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
