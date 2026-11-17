@@ -1,0 +1,562 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>อนุมัติเอกสาร - KTW Inventory System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        if (!sessionStorage.getItem('emp_id')) {
+            window.location.href = '../index.html';
+        }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .modal-transition { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease-out; }
+        .accordion-content { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+            .sw{position:relative;width:40px;height:22px;flex:none}
+        .sw input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0;width:100%;height:100%}
+        .sw span{position:absolute;inset:0;border-radius:999px;background:#cbd5e1;transition:background .15s}
+        .sw span::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+        .sw input:checked+span{background:#f97316} .sw input:checked+span::after{transform:translateX(18px)}
+        .sw input:focus-visible+span{outline:2px solid #f97316;outline-offset:2px}
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col md:flex-row antialiased">
+
+    <aside id="sidebar-container" class="hidden md:block h-screen sticky top-0 shrink-0"></aside>
+
+    <header class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden">
+                <span class="text-white font-black text-[9px] tracking-tighter">KTW</span>
+            </div>
+            <h2 class="text-sm font-semibold text-slate-950">KTW Inventory System</h2>
+        </div>
+        <button onclick="toggleMobileMenu()" class="p-1 rounded-lg text-slate-600 hover:bg-slate-50">
+            <i id="mobileMenuBtn" data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+    </header>
+
+    <div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+        <div onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+        <div class="fixed top-0 bottom-0 left-0 w-64 bg-white shadow-2xl flex flex-col">
+            <div id="mobile-sidebar-content" class="h-full"></div>
+        </div>
+    </div>
+
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+
+        <!-- ================= หัวข้อหน้า + ปุ่มควบคุมรวม ================= -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5 flex-wrap">
+                    <span>อนุมัติเอกสาร (ทุกระบบ)</span>
+                    <span id="totalPendingBadge" class="px-2.5 py-0.5 text-xs font-semibold bg-orange-100 text-brand-600 rounded-full border border-orange-200">
+                        กำลังโหลด...
+                    </span>
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-500 mt-1">ตรวจสอบและเซ็นอนุมัติเอกสารที่รอดำเนินการในคิวของท่าน รวมทุกระบบย่อยในหน้าเดียว</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 pt-2 md:pt-0 border-t md:border-0 border-slate-100">
+                <button onclick="collapseAllModules(true)" class="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all shadow-xs active:scale-95" title="พับทุกระบบ">
+                    <i data-lucide="fold-vertical" class="w-4 h-4 text-slate-500"></i>
+                    <span class="hidden sm:inline">พับทั้งหมด</span>
+                </button>
+                <button onclick="collapseAllModules(false)" class="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all shadow-xs active:scale-95" title="กางทุกระบบ">
+                    <i data-lucide="unfold-vertical" class="w-4 h-4 text-slate-500"></i>
+                    <span class="hidden sm:inline">กางทั้งหมด</span>
+                </button>
+                <button onclick="fetchAllQueues()" class="inline-flex items-center gap-2 h-10 px-4 rounded-xl text-xs font-semibold bg-orange-50 hover:bg-orange-100 text-brand-600 border border-orange-200 transition-all shadow-xs active:scale-95">
+                    <i id="syncIcon" data-lucide="refresh-cw" class="w-4 h-4 text-brand-500"></i>
+                    <span id="syncText">ซิงค์ข้อมูลล่าสุด</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="noPermissionNotice" class="hidden bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-sm text-amber-700 flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+            บัญชีของท่านยังไม่มีสิทธิ์เซ็นอนุมัติเอกสารของระบบใดเลย แสดงได้เฉพาะการดูรายละเอียดเท่านั้น
+        </div>
+
+        <!-- ================= แท็บกรองระบบ + ค้นหา ================= -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-xs">
+            <div id="systemTabsBar" class="flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0 min-w-0">
+                <!-- Dynamic tabs -->
+            </div>
+            <div class="relative px-2 lg:px-0 shrink-0">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <i data-lucide="search" class="w-4 h-4"></i>
+                </div>
+                <input type="text" id="globalSearchInput" oninput="filterApprovalTables()" placeholder="ค้นหาเลขที่เอกสาร / ผู้ขอ..."
+                    class="pl-9 pr-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:bg-white w-full lg:w-64 transition-all">
+            </div>
+        </div>
+
+        <!-- ================= คิวอนุมัติของแต่ละระบบ (วาดแบบไดนามิกทั้งหมดจาก APPROVAL_MODULES) ================= -->
+        <div id="approvalModulesContainer" class="space-y-5"></div>
+
+        <div class="p-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+            <div class="flex items-center gap-2">
+                <i data-lucide="plus-circle" class="w-4 h-4 text-slate-400"></i>
+                <span><strong>ระบบย่อยในอนาคต:</strong> หน้านี้รองรับการเชื่อมต่อระบบย่อยใหม่โดยอัตโนมัติ แค่เพิ่ม module เดียวใน config</span>
+            </div>
+            <span class="text-[11px] bg-slate-200/70 text-slate-600 px-2 py-0.5 rounded font-mono">EXTENSIBLE ARCHITECTURE</span>
+        </div>
+
+    </main>
+
+    <!-- ===================== MODAL: ตรวจสอบ + เซ็นอนุมัติ (ใช้ร่วมกันทุกระบบ) ===================== -->
+    <div id="signModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="modal-transition bg-white rounded-2xl shadow-2xl w-full max-w-[96vw] max-h-[92vh] flex flex-col scale-95 opacity-0" id="signModalBox">
+
+            <!-- Header สไตล์เข้ม -->
+            <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="p-2 bg-brand-500 text-white rounded-xl shadow-inner shrink-0">
+                        <i data-lucide="file-check-2" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-xs text-orange-200 font-medium" id="signModalSystemName">ระบบ</div>
+                        <h3 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2 truncate">
+                            <span class="shrink-0">เลขที่เอกสาร:</span>
+                            <span class="text-amber-300 font-mono truncate" id="signModalDocIdText">-</span>
+                        </h3>
+                    </div>
+                </div>
+                <button onclick="closeSignModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors shrink-0">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto px-6 py-5 space-y-5 text-xs">
+                <input type="hidden" id="signModuleKey" value="">
+                <input type="hidden" id="signDocId" value="">
+                <input type="hidden" id="signStageKey" value="">
+
+                <div class="space-y-2">
+                    <h4 class="font-bold text-slate-800 text-xs">รายละเอียดของเอกสาร</h4>
+                    <div id="signDocSummary" class="text-sm leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/80"></div>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="font-bold text-slate-800 text-xs">รายการที่เกี่ยวข้องกับเอกสารนี้</h4>
+                    <div class="border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs" id="signItemsTable">
+                                <thead id="signItemsHead"><tr class="bg-slate-100 border-b border-slate-200"></tr></thead>
+                                <tbody id="signItemsBody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ตารางเสริมเฉพาะบางระบบ (ประกาศผ่าน getExtraSections ใน MODULES) เช่น "รายการอะไหล่ที่แยกได้" ของ NCR ประเภท SCRAP แยกเป็นอะไหล่ -->
+                <div id="signExtraSections" class="space-y-2"></div>
+
+                <!-- 📎 เอกสารแนบประกอบ — โชว์เฉพาะเอกสารที่มีไฟล์แนบจริง (ดูใน renderSignAttachment) -->
+                <div id="signAttachmentWrap" class="space-y-2 hidden">
+                    <h4 class="font-bold text-slate-800 text-xs">เอกสารแนบประกอบ</h4>
+                    <div id="signAttachmentBox" class="border border-slate-200 rounded-xl p-3 bg-slate-50"></div>
+                </div>
+
+                <div id="signOdoNumberWrap" class="space-y-1.5 hidden">
+                    <label class="block font-bold text-slate-700 text-xs">เลข ODO <span class="text-red-500">*</span></label>
+                    <input id="signOdoNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลข ODO เพื่อแจ้งเจ้าหน้าที่คลังอะไหล่" />
+                </div>
+
+                <!-- 🆕 24/09/2569 : เลข Inbound — หน้างาน SCM ขอเพิ่ม (Disassembly stage 'scm' เท่านั้น, ไม่บังคับกรอก) -->
+                <div id="signInboundNumberWrap" class="space-y-1.5 hidden">
+                    <label class="block font-bold text-slate-700 text-xs">เลข Inbound</label>
+                    <input id="signInboundNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลข Inbound (ถ้ามี)" />
+                </div>
+
+                <!-- 🆕 24/09/2569 (เพิ่มรอบ 2) : เลข Reservation — หน้างาน SCM ขอเพิ่ม (Disassembly stage 'scm' เท่านั้น, ไม่บังคับกรอก) -->
+                <div id="signReservationNumberWrap" class="space-y-1.5 hidden">
+                    <label class="block font-bold text-slate-700 text-xs">เลข Reservation</label>
+                    <input id="signReservationNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลข Reservation (ถ้ามี)" />
+                </div>
+
+                <!-- 🏷️ NCR: MKT ต้องเลือกสถานะการเคลมก่อนอนุมัติ (stage 'mkt' เท่านั้น) -->
+                <div id="signNcrClaimStatusWrap" class="space-y-1.5 hidden">
+                    <label class="block font-bold text-slate-700 text-xs">สถานะการเคลม <span class="text-red-500">*</span></label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                            <input type="radio" name="signNcrClaimStatus" value="CLAIMABLE" class="accent-brand-500"> เคลมได้
+                        </label>
+                        <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                            <input type="radio" name="signNcrClaimStatus" value="NOT_CLAIMABLE" class="accent-brand-500"> เคลมไม่ได้
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 🧾 CLAIM: การตลาดต้องเลือกผลการพิจารณาก่อนกดยืนยัน (stage 'mkt' เท่านั้น)
+                     ⚠️ มีแค่ 2 ตัวเลือกตรงนี้ ส่วน "ตีกลับให้แก้ไข" เป็นปุ่มแยกด้านล่าง (REJECT_BACK)
+                        เพราะตีกลับไม่ใช่ผลการพิจารณา แต่เป็นการส่งเอกสารกลับไปให้แก้แล้ววนมาใหม่ -->
+                <div id="signClaimResultWrap" class="space-y-1.5 hidden">
+                    <label class="block font-bold text-slate-700 text-xs">ผลการพิจารณา <span class="text-red-500">*</span></label>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                            <input type="radio" name="signClaimResult" value="APPROVE" class="accent-emerald-500"> อนุมัติให้เคลม / ซ่อม
+                        </label>
+                        <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                            <input type="radio" name="signClaimResult" value="NOT_APPROVE" class="accent-red-500"> ไม่อนุมัติ
+                        </label>
+                    </div>
+                    <p class="text-[11px] text-slate-400">เลือก "ไม่อนุมัติ" ต้องระบุเหตุผลในช่องความเห็นด้วย</p>
+                </div>
+
+                <!-- 🏷️ NCR: SCM กรอกเลขที่ DO/WO, Wave, Inbound, PO ตามประเภท NCR (stage 'scm' เท่านั้น)
+                     🔧 30/09/2569 : SCRAP บังคับกรอก DO+Wave, SCRAP_PARTS บังคับกรอก DO+Inbound (ป้าย "(ไม่บังคับ)"/"*" สลับด้วย JS ตาม NcrType — ดู openSignModal) -->
+                <div id="signNcrDocNumbersWrap" class="space-y-3 hidden">
+                    <!-- NCR ประเภท SCRAP ใช้ "เลขที่ WO" แทน "เลขที่ DO" ช่องเลขที่ Wave วางต่อใต้ช่อง DO/WO (เรียงแนวตั้งเหมือนช่องอื่น)
+                         ค่าเลข WO เก็บในคอลัมน์ DoNumber เดิม — ต่างกันแค่ป้ายตามประเภท NCR -->
+                    <div id="signNcrDoWrap" class="hidden">
+                        <div class="space-y-3">
+                            <div class="space-y-1.5">
+                                <label class="block font-bold text-slate-700 text-xs"><span id="signNcrDoLabel">เลขที่ DO</span> <span id="signNcrDoRequiredMark" class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+                                <input id="signNcrDoNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลขที่ DO" />
+                            </div>
+                            <div id="signNcrWaveWrap" class="space-y-1.5 hidden">
+                                <label class="block font-bold text-slate-700 text-xs">เลขที่ Wave <span id="signNcrWaveRequiredMark" class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+                                <input id="signNcrWaveNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลขที่ Wave (ถ้ามี)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div id="signNcrInboundWrap" class="space-y-1.5 hidden">
+                        <label class="block font-bold text-slate-700 text-xs">เลขที่ Inbound <span id="signNcrInboundRequiredMark" class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+                        <input id="signNcrInboundNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลขที่ Inbound (ถ้ามี)" />
+                    </div>
+                    <div id="signNcrPoWrap" class="space-y-1.5 hidden">
+                        <label class="block font-bold text-slate-700 text-xs">เลขที่ PO <span class="text-slate-400 font-normal">(ไม่บังคับ)</span></label>
+                        <input id="signNcrPoNumber" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลขที่ PO (ถ้ามี)" />
+                    </div>
+                </div>
+
+                <!-- 🆕 29/09/2569 : NCR ประเภท SCRAP เคลม VENDOR — ขั้นตอน SCM แยกเป็น 3 sub-step (SCM คนที่ 1 → SCM คนที่ 2 → หัวหน้า SCM)
+                     สถานะเอกสารยังคงเป็น "รอเจ้าหน้าที่ SCM" (StepNo=3) ตลอดทั้ง 3 sub-step ตามที่หน้างานตกลง -->
+                <div id="signNcrScmVendorWrap" class="space-y-4 hidden">
+                    <!-- Sub-step 1: SCM คนที่ 1 กรอกเลขที่ DO แล้วมอบหมายให้ SCM คนที่ 2
+                         🔧 30/09/2569 : ตัดช่อง "ราคา" รวมออก — ย้ายไปกรอกทีละรายการในตาราง "รายการที่เกี่ยวข้องกับเอกสารนี้" ด้านบนแทน (ดู itemColumns ของ module ncr) -->
+                    <div id="signNcrScm1Wrap" class="space-y-3 hidden">
+                        <div class="space-y-1.5">
+                            <label class="block font-bold text-slate-700 text-xs">เลขที่ DO <span class="text-red-500">*</span></label>
+                            <input id="signNcrScm1Do" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลขที่ DO" />
+                        </div>
+                        <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                            <i data-lucide="info" class="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0"></i>
+                            <p class="text-[11px] text-amber-700">กรุณาระบุราคาของแต่ละรายการในตาราง "รายการที่เกี่ยวข้องกับเอกสารนี้" ด้านบน (บังคับกรอกทุกรายการ)</p>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block font-bold text-slate-700 text-xs">มอบหมายให้ SCM คนที่ 2 กรอกเลขที่ PO ต่อ <span class="text-red-500">*</span></label>
+                            <select id="signNcrScm2Select" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                                <option value="">-- เลือก SCM คนที่ 2 --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Sub-step 2: SCM คนที่ 2 กรอกเลขที่ PO -->
+                    <div id="signNcrScm2Wrap" class="space-y-3 hidden">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-500 space-y-1">
+                            <p>เลขที่ DO: <span class="font-mono font-semibold text-slate-700" id="signNcrScm2DoDisplay">-</span></p>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block font-bold text-slate-700 text-xs">เลขที่ PO <span class="text-red-500">*</span></label>
+                            <input id="signNcrScm2Po" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลขที่ PO" />
+                        </div>
+                    </div>
+
+                    <!-- Sub-step 3: หัวหน้า SCM ตรวจสอบราคา/PO แล้วอนุมัติ/ไม่อนุมัติ (ราคาไม่แสดงในหน้าพิมพ์เอกสาร ตามที่หน้างานตกลง)
+                         🔧 30/09/2569 : ตัดแถว "ราคา" รวมออก — ราคาตอนนี้แสดงเป็นรายรายการในตาราง "รายการที่เกี่ยวข้องกับเอกสารนี้" ด้านบนแทน -->
+                    <div id="signNcrScmHeadWrap" class="space-y-3 hidden">
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-500 space-y-1">
+                            <p>เลขที่ DO: <span class="font-mono font-semibold text-slate-700" id="signNcrScmHeadDoDisplay">-</span></p>
+                            <p>เลขที่ PO: <span class="font-mono font-semibold text-slate-700" id="signNcrScmHeadPoDisplay">-</span></p>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block font-bold text-slate-700 text-xs">ผลการตรวจสอบ <span class="text-red-500">*</span></label>
+                            <div class="flex flex-wrap gap-4">
+                                <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                                    <input type="radio" name="signNcrScmHeadDecision" value="APPROVE" class="accent-emerald-500"> อนุมัติ
+                                </label>
+                                <label class="flex items-center gap-1.5 text-sm text-slate-700">
+                                    <input type="radio" name="signNcrScmHeadDecision" value="REJECT" class="accent-red-500"> ไม่อนุมัติ
+                                </label>
+                            </div>
+                            <p class="text-[11px] text-red-500">เลือก "ไม่อนุมัติ" เอกสารจะปิดจบทันที ต้องสร้างเอกสารใหม่เท่านั้น (ย้อนกลับแก้ไขไม่ได้) และต้องระบุเหตุผลในช่องความเห็นด้วย</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🆕 25/09/2569 : NCR "รายการอะไหล่ที่แยกได้" — ย้ายมาให้ เจ้าหน้าที่แผนกรับเข้าคลังอะไหล่ (SPM) เป็นผู้กรอกตอนอนุมัติขั้นนี้แทน
+                     (เดิมบังคับกรอกตอนสร้างเอกสาร ซึ่งตอนนั้นยังไม่รู้ว่าจะแยกอะไหล่ได้อะไรบ้าง) stage 'spm' เท่านั้น, NcrType SCRAP_PARTS เท่านั้น -->
+                <div id="signNcrPartsItemsWrap" class="space-y-2 hidden">
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="block font-bold text-slate-700 text-xs">รายการอะไหล่ที่แยกได้ <span class="text-red-500">*</span></label>
+                        <button type="button" onclick="addSignNcrPartsItemRow()" class="h-8 px-3 rounded-lg text-xs font-semibold text-brand-600 border border-brand-200 hover:bg-brand-50 inline-flex items-center gap-1.5 shrink-0">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> เพิ่มรายการ
+                        </button>
+                    </div>
+                    <div class="border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs" style="table-layout:fixed">
+                                <!-- 🆕 26/09/2569 : ตัดคอลัมน์ "ชื่อร้าน" ออก (ผู้สร้างเอกสารกรอกชื่อร้านไว้ตั้งแต่ตอนสร้างเอกสารแล้ว ไม่ต้องให้ SPM กรอกซ้ำ)
+                                     และจัดหัวคอลัมน์ให้อยู่กึ่งกลางเหมือนคอลัมน์ # -->
+                                <colgroup>
+                                    <col style="width:6%"><col style="width:20%"><col style="width:40%"><col style="width:12%"><col style="width:14%"><col style="width:8%">
+                                </colgroup>
+                                <thead>
+                                    <tr class="bg-slate-100 border-b border-slate-200">
+                                        <th class="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase text-center">#</th>
+                                        <th class="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase text-center">Prod.Code</th>
+                                        <th class="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase text-center">Description</th>
+                                        <th class="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase text-center">Qty</th>
+                                        <th class="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase text-center">หน่วย</th>
+                                        <th class="px-2 py-1.5 text-[10px] font-semibold text-slate-500 uppercase"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="signNcrPartsItemRowsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400">พิมพ์รหัสอะไหล่อย่างน้อย 2 ตัวอักษรเพื่อค้นหา แล้วเลือกจากรายการที่ขึ้นมา ระบบจะเติมรายละเอียดสินค้าให้อัตโนมัติ</p>
+                </div>
+
+                <!-- 🔄 SWAP: SCM บันทึกเลข ODO / Inbound และเลือกผู้รับต่อ (stage 'scm' เท่านั้น)
+                     ทุกช่องไม่บังคับกรอก — ไม่เลือกใครเลย เอกสารก็จบที่ขั้นนี้ -->
+                <div id="signSwapInboundWrap" class="space-y-3 hidden">
+                    <div class="space-y-1.5">
+                        <label class="block font-bold text-slate-700 text-xs">เลข ODO</label>
+                        <input id="signSwapOdo" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="ระบุเลข ODO (ถ้ามี)" />
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="space-y-1.5">
+                            <label class="block font-bold text-slate-700 text-xs">Inbound Document (MCM - คลังเครื่อง)</label>
+                            <input id="signSwapInboundMcm" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="เลขที่ Inbound ของคลังเครื่อง" />
+                            <select id="signSwapMcmNotify" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                                <option value="">-- ไม่ส่งต่อให้ MCM --</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block font-bold text-slate-700 text-xs">Inbound Document (SPM - คลังอะไหล่)</label>
+                            <input id="signSwapInboundSpm" type="text" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none font-mono" placeholder="เลขที่ Inbound ของคลังอะไหล่" />
+                            <select id="signSwapSpmNotify" class="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none">
+                                <option value="">-- ไม่ส่งต่อให้ SPM --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        ทั้ง 3 ช่องไม่บังคับกรอก · เลือกผู้รับต่อได้ทั้งสองช่อง เลือกช่องเดียว หรือไม่เลือกเลยก็ได้ — ถ้าไม่เลือกใคร เอกสารจะจบที่ขั้นนี้
+                    </p>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label id="signCommentLabel" class="block font-bold text-slate-700 text-xs">ความเห็นประกอบการอนุมัติ (ถ้ามี)</label>
+                    <textarea id="signComment" rows="2" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none" placeholder="เช่น ตรวจสอบแล้วถูกต้อง / ให้เร่งดำเนินการ"></textarea>
+                </div>
+
+                <div class="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 flex items-center gap-3 text-amber-900">
+                    <i data-lucide="shield-check" class="w-5 h-5 text-amber-600 shrink-0"></i>
+                    <p class="text-[11px] leading-relaxed">
+                        การกดยืนยันจะบันทึกการอนุมัติด้วยสิทธิ์บัญชี <strong id="signSignerName">-</strong> และเก็บประวัติการดำเนินการไว้ในระบบ
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center gap-3 px-6 py-4 border-t border-slate-200 shrink-0">
+                <button id="signRejectBtn" onclick="openRejectModal()" class="w-full sm:w-auto h-10 px-4 rounded-xl text-sm font-semibold text-red-600 hover:bg-red-50 flex items-center justify-center gap-1.5">
+                    <i data-lucide="x-circle" class="w-4 h-4"></i> <span id="signRejectBtnText">ปฏิเสธเอกสาร</span>
+                </button>
+                <div class="flex items-center gap-3 w-full sm:w-auto justify-end sm:ml-auto">
+                    <!-- 🏷️ พิมพ์บัตรขอแกะอะไหล่ (Sticker) — เฉพาะระบบ Disassembly เท่านั้น 🆕 23/09/2569 -->
+                    <button id="signStickerBtn" onclick="printPartsStickerFromSignModal()" class="hidden h-10 px-4 rounded-xl text-sm font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+                        <i data-lucide="tag" class="w-4 h-4"></i>
+                        พิมพ์บัตรขอแกะอะไหล่
+                    </button>
+                    <button onclick="openPreviewFromSignModal()" class="h-10 px-4 rounded-xl text-sm font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                        ตัวอย่างเอกสาร
+                    </button>
+                    <button onclick="submitSignature()" id="submitSignBtn" class="h-10 px-5 rounded-xl text-sm font-semibold bg-brand-500 text-white hover:bg-brand-600 shadow-md shadow-brand-500/10 flex items-center gap-2 active:scale-95">
+                        <i data-lucide="check" class="w-4 h-4"></i>
+                        <span id="submitSignBtnText">ยืนยันอนุมัติ</span>
+                    </button>
+                    <button onclick="closeSignModal()" class="h-10 px-4 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100">ยกเลิก</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== MODAL: ปฏิเสธ/ตีกลับเอกสาร ===================== -->
+    <div id="rejectModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+        <div class="modal-transition bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                <h2 id="rejectModalTitle" class="text-lg font-bold text-slate-900">ปฏิเสธเอกสาร</h2>
+                <button onclick="closeRejectModal()" class="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="px-6 py-5 space-y-3">
+                <p id="rejectModalDescription" class="text-sm text-slate-500">กรุณาระบุเหตุผลในการปฏิเสธเอกสารนี้ เพื่อแจ้งให้ผู้ขออนุมัติทราบ</p>
+                <textarea id="rejectReason" rows="3" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-red-400 outline-none" placeholder="เช่น ข้อมูลไม่ครบถ้วน / รหัสอะไหล่ไม่ถูกต้อง"></textarea>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200">
+                <button onclick="closeRejectModal()" class="h-10 px-4 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">ยกเลิก</button>
+                <button id="confirmRejectBtn" onclick="submitReject()" class="h-10 px-5 rounded-xl text-sm font-semibold bg-red-500 text-white hover:bg-red-600 shadow-md shadow-red-500/10">ยืนยันปฏิเสธ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== MODAL: ตัวอย่างเอกสาร (Preview เท่านั้น ไม่มีปุ่มพิมพ์) ===================== -->
+    <div id="previewDocModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="modal-transition bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col scale-95 opacity-0" id="previewDocModalBox">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="file-text" class="w-5 h-5 text-slate-400"></i>
+                    ตัวอย่างเอกสาร (Preview)
+                </h2>
+                <button onclick="closePreviewDocModal()" class="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="overflow-y-auto p-6 sm:p-10 bg-slate-100">
+                <div id="previewDocPaperApprove" class="bg-white text-slate-800 text-[15px] max-w-6xl mx-auto p-8 sm:p-12 rounded-lg shadow-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================== MODAL: พิมพ์บัตรขอแกะอะไหล่ (Sticker) — เฉพาะ Disassembly 🆕 23/09/2569 ===================== -->
+    <div id="stickerPreviewModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div class="modal-transition bg-slate-200 rounded-2xl shadow-2xl w-full overflow-hidden flex flex-col scale-95 opacity-0" style="max-width: 900px; width: 92vw; max-height: 92vh" id="stickerPreviewModalBox">
+            <div class="print:hidden flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="tag" class="w-4 h-4 text-cyan-600"></i>
+                    <h3 class="text-sm font-bold text-slate-950">พิมพ์บัตรขอแกะอะไหล่ — <span id="stickerPreviewDocId" class="font-mono"></span></h3>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="printStickers()" class="h-9 px-3.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                        พิมพ์ทั้งหมด (<span id="stickerCountText">0</span> ใบ)
+                    </button>
+                    <button onclick="closeStickerPreviewModal()" class="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 flex items-center justify-center transition-colors">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-y-auto flex-1 p-5 sm:p-8 bg-slate-100">
+                <div id="stickerPreviewList" class="flex flex-wrap gap-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stickerPrintArea" class="hidden"></div>
+    <style>
+        @media print {
+            body.printing-stickers > *:not(#stickerPrintArea) {
+                display: none !important;
+            }
+            #stickerPrintArea {
+                display: none;
+            }
+            body.printing-stickers #stickerPrintArea {
+                display: block !important;
+                position: static !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            /* 🔧 23/09/2569 (รอบ 4) : ล้าง margin เริ่มต้นของ body/html ที่ @page margin:0 ไม่ได้ล้างให้
+               (ดูรายละเอียดเหตุผลเดียวกันใน disassembly_form.html) */
+            html,
+            body.printing-stickers {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        }
+
+        /* ===================================================================
+           🏷️ บัตรขอแกะอะไหล่ (Sticker) — ขนาดจริง 8x4cm (80mm x 40mm)
+           เครื่องพิมพ์: Honeywell PC42e-t, 200dpi
+           🔧 23/09/2569 : ตัดเส้นกรอบตาราง (.sticker-table เดิม) ออกทั้งหมดตามที่หน้างานแจ้ง —
+           เปลี่ยนเป็น label เล็ก + เส้นใต้ (underline) แบบฟอร์มกระดาษทั่วไป ไม่ใช่ตารางกริด
+           🔧 23/09/2569 (รอบ 4) : พอ @page ขนาดจริงทำงานแล้วพบว่ายังล้นไปหน้า 2 อีกเล็กน้อย —
+           ใช้ line-height:1 ชัดเจนทุกที่ และลดขนาดลงอีกรอบให้เหลือพื้นที่เผื่อ (buffer) มากพอสมควร
+        =================================================================== */
+        .sticker-card {
+            width: 80mm;
+            height: 40mm;
+            box-sizing: border-box;
+            padding: 1mm 1mm 0.5mm 1mm;
+            font-family: 'Prompt', 'Tahoma', sans-serif;
+            color: #000;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5mm;
+            overflow: hidden;
+        }
+        #stickerPrintArea .sticker-card { page-break-after: always; page-break-inside: avoid; }
+        #stickerPrintArea .sticker-card:last-child { page-break-after: auto; }
+        .sticker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 7pt;
+            font-weight: 400;
+            padding-bottom: 0.3mm;
+            margin-bottom: 0.3mm;
+            line-height: 1;
+        }
+        /* 🔧 23/09/2569 (รอบ 7) : หน้างานแจ้งว่าเส้นใต้ทำให้ตาลาย — ตัดเส้นทั้งหมดออก
+           ใช้ระยะห่าง (spacing) แทนเส้นแบ่ง */
+        .sticker-line { display: flex; gap: 3mm; align-items: baseline; }
+        .sticker-line-tall { align-items: flex-start; min-height: 5.5mm; }
+        .sticker-field { flex: 1; display: flex; align-items: baseline; gap: 1mm; min-width: 0; }
+        .sticker-field-lbl { font-size: 6.5pt; font-weight: 400; color: #000; line-height: 1; white-space: nowrap; flex-shrink: 0; }
+        .sticker-field-val {
+            flex: 1;
+            font-size: 8pt;
+            font-weight: 400;
+            line-height: 1;
+            min-height: 3mm;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sticker-block { display: flex; flex-direction: column; gap: 0.3mm; }
+        .sticker-blank-area { min-height: 7mm; }
+        .sticker-footer-line { margin-top: auto; }
+    </style>
+
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- แกนกลางระบบ KTW HUB -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- โมดูล Service ของ approve.html (Logic แยกจาก HTML) -->
+    <script src="../modules/approveService.js"></script>
+</body>
+</html>

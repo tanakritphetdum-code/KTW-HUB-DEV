@@ -48,21 +48,28 @@ KTW-HUB-DEV/
   - จัดเตรียมโครงสร้างโฟลเดอร์แบบแยกสัดส่วน (`shared/`, `pages/`, `modules/`)
   - สร้าง `version.js` สำหรับคุมเวอร์ชันทั้งระบบ
   - สร้าง `shared/config.js` แยกคอนฟิกสภาพแวดล้อม DEV ออกจากโค้ดหน้างาน
-  - สร้างไฟล์ `_redirects` สำหรับทำ Reverse Proxy บน Netlify
-  - สร้าง `shared/devBanner.js` แสดงแถบส้มเตือนโหมดทดสอบ
+  - สร้าง `shared/devBanner.js` แสดงแถบส้มเตือนโหมดทดสอบแบบ Floating Badge
 - [x] **Phase 2: ปรับปรุงระบบแกนกลาง (Core Shared Services)**
-  - พัฒนา `shared/api.js` รองรับการยิง Webhook ทั้งแบบตรงและผ่าน Proxy `/api/`
-  - พัฒนา `shared/perm.js` รองรับระบบ Permission กลาง
+  - พัฒนา `shared/api.js` รองรับการยิง Webhook ตรงไปยัง n8n พร้อม DEV rewrite
+  - พัฒนา `shared/perm.js` รองรับระบบ Permission กลาง (perm_my)
   - พัฒนา `shared/menu.js` คำนวณเส้นทางลิงก์และสิทธิ์อัตโนมัติ
   - พัฒนา `main.html` ฉบับ Dynamic Portal (วาดการ์ดระบบงานจาก `menu.js` อัตโนมัติ)
-  - พัฒนา `index.html` หน้า Login ดีไซน์ทันสมัย
+  - พัฒนา `index.html` หน้า Login ดีไซน์ทันสมัยแบบ Non-blocking
 - [x] **Phase 3: แยกโมดูลระบบนำร่อง (Pilot Module - SWAP Product)**
-  - แยกหน้าจอ `pages/swap.html` (ลดขนาดจาก 4,552 บรรทัด เหลือ ~1,330 บรรทัด)
-  - สกัด Logic การทำงานทั้งหมดออกเป็น `modules/swapService.js` (~3,200 บรรทัด)
-- [ ] **Phase 4: ทดสอบการทำงานจริงบน Netlify (In Progress)**
+  - แยกหน้าจอ `pages/swap.html` (ลดขนาดเหลือ ~66 KB)
+  - สกัด Logic การทำงานทั้งหมดออกเป็น `modules/swapService.js` (~178 KB)
+- [x] **Phase 4: ทดสอบการทำงานจริงบน Local Server (เสร็จสมบูรณ์)**
   - ทดสอบ End-to-End: Login ➔ หน้า Portal ➔ กรอกฟอร์ม SWAP ➔ n8n Webhook (-dev) ➔ SQL Database (-Dev)
-- [ ] **Phase 5: ทยอยแปลงระบบที่เหลือ & ส่งมอบขึ้น Production Server**
-  - แปลงระบบ: `disassembly`, `ncr`, `claim`, `borrow`, `pettycash`, `approve`, `employees`
+  - ปรับปรุง Layout ไม่ให้เกิดการเลื่อนหลุดเฟรม และใส่ Cache-Control
+- [x] **Phase 5: แปลงระบบที่เหลือทั้งหมดครบถ้วน 100% (Completed)**
+  - `pages/approve.html` + `modules/approveService.js` (ศูนย์กลางการอนุมัติเอกสารทุกระบบ)
+  - `pages/disassembly.html` + `modules/disassemblyService.js` (ขออนุมัติแกะอะไหล่)
+  - `pages/ncr.html` + `modules/ncrService.js` (เอกสาร NCR)
+  - `pages/claim.html` + `modules/claimService.js` (เคลมสินค้าลูกค้า)
+  - `pages/borrow.html` + `modules/borrowService.js` (ยืมสินค้าหน้าร้าน)
+  - `pages/pettycash.html` + `modules/pettycashService.js` (บันทึกเงินสดย่อย)
+  - `pages/employees.html` + `modules/employeeService.js` (การจัดการ User & Role)
+  - `pages/history_log.html` + `modules/historyLogService.js` (ประวัติการทำงาน Audit Log)
 
 ---
 

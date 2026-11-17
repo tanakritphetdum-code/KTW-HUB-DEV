@@ -1,0 +1,653 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>จัดการผู้ใช้และสิทธิ์ - KTW Inventory System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Tailwind + Lucide คงไว้เพื่อให้ sidebar จาก menu.js แสดงผลเหมือนหน้าอื่นทุกหน้า -->
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  if (window.tailwind) tailwind.config = { theme: { extend: {
+    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+    colors: { brand: { 50:'#fff7ed', 100:'#ffedd5', 500:'#f97316', 600:'#ea580c', 700:'#c2410c' } }
+  } } };
+</script>
+<script>
+  // ระบบป้องกันความปลอดภัย: ต้อง login ก่อน และต้องเป็น Admin ของระบบใดระบบหนึ่ง (รวม Claim) จึงเข้าหน้านี้ได้
+  const currentEmpId = sessionStorage.getItem('emp_id');
+  const claimRoleSession = sessionStorage.getItem('claim_role') || '0';
+  const isAdminAnySystem = (sessionStorage.getItem('emp_type') || '0') === '1'
+    || (sessionStorage.getItem('disassembly_role') || '0') === '1'
+    || (sessionStorage.getItem('ncr_role') || '0') === '1'
+    || claimRoleSession === '1'
+    || (sessionStorage.getItem('borrow_role') || '0') === '1';
+  if (!currentEmpId) { window.location.href = '../index.html'; }
+  else if (!isAdminAnySystem) { window.location.href = 'main.html'; }
+</script>
+<style>
+/* ============================================================
+   TOKENS — โหมดมืดตาม class/attribute ที่ menu.js ตั้งบน <html>
+   ============================================================ */
+:root{
+  --bg:#F4F5F7; --surface:#FFFFFF; --surface-2:#F1F3F6; --surface-3:#E9ECF1;
+  --line:#E2E6EC; --line-strong:#CBD2DC;
+  --ink:#18202E; --ink-2:#465063; --ink-3:#848DA0;
+  --brand:#EA580C; --brand-hover:#C2410C; --brand-soft:#FFF0E6;
+  --swap:#EA580C; --dis:#7C3AED; --ncr:#2563EB; --claim:#0E9F6E; --brw:#D97706;
+  --warn:#B45309; --warn-soft:#FEF3C7; --danger:#DC2626; --danger-soft:#FEE2E2; --ok:#0E9F6E;
+  --shadow-pop:0 12px 32px -8px rgba(16,24,40,.22),0 2px 6px rgba(16,24,40,.06);
+  --r-md:10px; --r-lg:14px;
+}
+html.dark, html[data-theme="dark"], body.dark, body.ktwda-dark{
+  --bg:#0E1218; --surface:#151A22; --surface-2:#1B212B; --surface-3:#232A36;
+  --line:#29313E; --line-strong:#3A4454;
+  --ink:#E8EBF1; --ink-2:#B2B9C6; --ink-3:#7A8396;
+  --brand:#FF7A2E; --brand-hover:#FF8F4F; --brand-soft:#3A2214;
+  --swap:#FF7A2E; --dis:#A78BFA; --ncr:#60A5FA; --claim:#34D399; --brw:#FBBF24;
+  --warn:#FBBF24; --warn-soft:#3A2E10; --danger:#F87171; --danger-soft:#3B1717; --ok:#34D399;
+  --shadow-pop:0 16px 40px -8px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+body{margin:0;font-family:"Prompt",system-ui,sans-serif;font-size:13.5px;line-height:1.5;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+.num{font-variant-numeric:tabular-nums}
+svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:inline-block}
+
+.page{flex:1;min-width:0;padding:28px 32px 28px}
+
+/* HEADER */
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:22px}
+.head h1{font-size:25px;line-height:1.25;margin:0 0 6px;font-weight:600;color:var(--ink)}
+.head p{margin:0;color:var(--ink-2);max-width:64ch}
+.sync{display:inline-flex;align-items:center;gap:6px;color:var(--ink-3);font-size:12px;margin-top:8px}
+.sync i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 20%,transparent)}
+.sync.err i{background:var(--danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 20%,transparent)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 14px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:500;white-space:nowrap;cursor:pointer}
+.btn:hover{border-color:var(--line-strong);background:var(--surface-2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:var(--brand-hover)}
+.btn.danger{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 35%,var(--line))}
+.btn.danger:hover{background:var(--danger-soft)}
+.btn.danger-solid{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.sm{height:32px;padding:0 11px;font-size:13px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn.hide{display:none}
+
+/* COVERAGE */
+.cover{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:22px}
+.sys{background:var(--surface);padding:16px 18px 14px;min-width:0}
+.sys-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:2px 8px;margin-bottom:10px}
+.sys-name{display:flex;align-items:center;gap:8px;font-weight:600}
+.sys-name i{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.sys-name small{font-weight:400;color:var(--ink-3);white-space:nowrap}
+.sys-count{font-size:12px;color:var(--ink-3);white-space:nowrap}
+.sys-count b{font-size:20px;color:var(--ink);font-weight:600;margin-right:3px}
+.bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--surface-3);margin-bottom:12px;gap:2px}
+.bar span{display:block;height:100%;background:var(--c)}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}
+.lg{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 6px;margin:0 -6px;border:0;background:none;border-radius:6px;font-size:12.5px;color:var(--ink-2);text-align:left;min-width:0;cursor:pointer}
+.lg:hover{background:var(--surface-2);color:var(--ink)}
+.lg.on{background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--ink);font-weight:600}
+.lg em{font-style:normal;display:flex;align-items:center;gap:6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.lg em::before{content:"";width:6px;height:6px;border-radius:2px;background:var(--c);opacity:var(--o,1);flex:none}
+.lg .num{color:var(--ink-3)}
+.lg.zero{opacity:.45}
+.lg.unset{color:var(--danger)}
+.lg.unset em::before{background:var(--danger)}
+
+/* PANEL / TOOLS */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.search{position:relative;flex:1 1 260px;max-width:400px}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-3)}
+.search input{width:100%;height:38px;border:1px solid var(--line);border-radius:9px;background:var(--surface-2);padding:0 34px 0 34px;color:var(--ink)}
+.search input:focus{outline:none;border-color:var(--brand);background:var(--surface)}
+.search kbd{position:absolute;right:9px;top:50%;transform:translateY(-50%);font:11px/1 inherit;color:var(--ink-3);border:1px solid var(--line);border-radius:4px;padding:3px 5px;background:var(--surface)}
+select.sel{height:38px;border:1px solid var(--line);border-radius:9px;background-color:var(--surface);color:var(--ink);padding:0 30px 0 12px;appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23848DA0' stroke-width='2.2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;max-width:240px}
+.toggle{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:9px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-size:13px;cursor:pointer;white-space:nowrap}
+.toggle:hover{background:var(--surface-2)}
+.toggle[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
+.tools .divider{width:1px;height:24px;background:var(--line)}
+.tools .grow{flex:1}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.chips:empty{display:none}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 6px 0 10px;border-radius:13px;border:1px solid var(--line);background:var(--surface);font-size:12.5px}
+.fchip button{border:0;background:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:var(--ink-3);padding:0;cursor:pointer}
+.fchip button:hover{background:var(--surface-3);color:var(--ink)}
+.fchip.clear{border-style:dashed;color:var(--ink-3);padding:0 10px;cursor:pointer}
+
+/* TABLE */
+.tablewrap{overflow-x:auto}
+table.emp{width:100%;border-collapse:collapse;min-width:1080px}
+.emp thead th{position:sticky;top:0;z-index:2;background:var(--surface);text-align:left;font-weight:600;font-size:12.5px;color:var(--ink-2);padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.emp th.sys-h{border-left:1px solid var(--line);padding-left:14px}
+.emp th.sys-h .sort::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--c);margin-right:3px}
+.emp th .sort{border:0;background:none;padding:0;font-weight:600;display:inline-flex;align-items:center;gap:4px;color:inherit;cursor:pointer}
+.emp th .sort[data-on] svg{color:var(--brand)}
+.emp tbody td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.emp tbody tr:hover td{background:color-mix(in srgb,var(--surface-2) 70%,transparent)}
+.emp tbody tr.picked td{background:color-mix(in srgb,var(--brand) 6%,var(--surface))}
+.emp td.sys-c{padding-left:10px;border-left:1px solid var(--line)}
+.ck{width:16px;height:16px;accent-color:var(--brand);cursor:pointer}
+.who{display:flex;align-items:center;gap:11px;min-width:0}
+.av{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:600;font-size:13px;flex:none;background:color-mix(in srgb,var(--h) 18%,var(--surface));color:color-mix(in srgb,var(--h) 80%,var(--ink))}
+.who-n{border:0;background:none;padding:0;text-align:left;min-width:0;cursor:pointer;color:var(--ink)}
+.who-n strong{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+.who-n:hover strong{color:var(--brand)}
+.who-n small{display:block;color:var(--ink-3);font-size:12px}
+.tag-me{font-size:10.5px;font-weight:600;color:var(--brand);background:var(--brand-soft);border-radius:4px;padding:0 5px;margin-left:4px;vertical-align:1px}
+.dep{display:inline-block;font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);padding:2px 8px;border-radius:6px;white-space:nowrap;max-width:210px;overflow:hidden;text-overflow:ellipsis}
+.mail{color:var(--ink-2);font-size:13px}
+.mail.missing{display:inline-flex;align-items:center;gap:5px;color:var(--warn);font-size:12px;background:var(--warn-soft);padding:2px 8px;border-radius:6px}
+
+/* ROLE CHIP */
+.role{--c:var(--ink-3);display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 4px;border-radius:7px;border:1px solid transparent;background:transparent;font-size:12.5px;white-space:nowrap;position:relative;max-width:100%;cursor:pointer;color:var(--ink)}
+.role .n{display:grid;place-items:center;min-width:20px;height:20px;padding:0 3px;border-radius:5px;font-size:11px;font-weight:600}
+.role .caret{opacity:0;color:var(--ink-3);margin-left:-2px;width:13px;height:13px}
+.role:hover .caret,.role:focus-visible .caret{opacity:1}
+.role.staff{color:var(--ink-3)}
+.role.staff .n{background:var(--surface-2);color:var(--ink-3)}
+.role.staff:hover{border-color:var(--line);background:var(--surface)}
+.role.unset{color:var(--danger);border:1px dashed color-mix(in srgb,var(--danger) 45%,transparent)}
+.role.unset .n{background:var(--danger-soft);color:var(--danger)}
+.role.lvl{color:color-mix(in srgb,var(--c) 85%,var(--ink));background:color-mix(in srgb,var(--c) 11%,transparent);font-weight:500}
+.role.lvl .n{background:color-mix(in srgb,var(--c) 22%,transparent)}
+.role.lvl:hover{border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.role.admin{background:var(--c);color:#fff;font-weight:600}
+.role.admin .n{background:rgba(255,255,255,.22);color:#fff}
+.role.admin .caret{color:#fff}
+.role.pending{outline:2px solid var(--brand);outline-offset:1px}
+.role.pending::after{content:"";position:absolute;top:-4px;right:-4px;width:8px;height:8px;border-radius:50%;background:var(--brand);border:2px solid var(--surface)}
+.role.failed{outline-color:var(--danger)}
+.role.failed::after{background:var(--danger)}
+.role .flag{font-size:10px;font-weight:600;border-radius:4px;padding:0 4px;background:rgba(255,255,255,.25)}
+.role.lvl .flag,.role.staff .flag{background:color-mix(in srgb,var(--c) 20%,transparent);color:color-mix(in srgb,var(--c) 85%,var(--ink))}
+.role.static{cursor:default}
+.icon-btn{width:32px;height:32px;display:grid;place-items:center;border-radius:8px;border:0;background:none;color:var(--ink-3);cursor:pointer}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;color:var(--ink-2);font-size:13px}
+.pager{display:flex;align-items:center;gap:4px}
+.pager button{min-width:32px;height:32px;border-radius:8px;border:1px solid transparent;background:none;padding:0 8px;cursor:pointer;color:var(--ink)}
+.pager button:hover:not(:disabled){background:var(--surface-2)}
+.pager button.on{border-color:var(--line);background:var(--surface-2);font-weight:600}
+.pager button:disabled{opacity:.35;cursor:default}
+.empty{padding:56px 20px;text-align:center;color:var(--ink-2)}
+.empty strong{display:block;font-size:16px;color:var(--ink);margin-bottom:4px}
+.skel{height:12px;border-radius:6px;background:var(--surface-3);animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.45}}
+
+/* POPOVER */
+.pop{position:fixed;z-index:60;width:272px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow-pop);padding:6px;display:none}
+.pop.open{display:block}
+.pop h4{margin:4px 8px 6px;font-size:12px;font-weight:500;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.pop h4 i{width:8px;height:8px;border-radius:2px;background:var(--c)}
+.opt{display:grid;grid-template-columns:24px 1fr 16px;align-items:center;gap:8px;width:100%;padding:7px 8px;border:0;background:none;border-radius:7px;text-align:left;cursor:pointer;color:var(--ink)}
+.opt:hover,.opt:focus-visible{background:var(--surface-2);outline:none}
+.opt .n{display:grid;place-items:center;width:24px;height:22px;border-radius:5px;font-size:11px;font-weight:600;background:color-mix(in srgb,var(--c) 16%,transparent);color:color-mix(in srgb,var(--c) 85%,var(--ink))}
+.opt b{display:block;font-weight:500}
+.opt small{display:block;color:var(--ink-3);font-size:11.5px;line-height:1.35}
+.opt .tick{color:var(--brand);visibility:hidden}
+.opt[aria-checked="true"] .tick{visibility:visible}
+.opt[aria-checked="true"] b{font-weight:600}
+.opt .was{font-size:11px;color:var(--ink-3);font-weight:400}
+
+/* DOCK (sticky ด้านล่างของเนื้อหา) */
+.dock{position:sticky;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:40;display:flex;flex-direction:column;gap:8px;align-items:center;margin:16px auto 0;width:min(860px,100%);pointer-events:none}
+.bar-f{display:none;width:100%;align-items:center;gap:10px;padding:10px 10px 10px 18px;border-radius:12px;background:var(--ink);color:var(--bg);box-shadow:var(--shadow-pop);pointer-events:auto;flex-wrap:wrap}
+.bar-f.open{display:flex}
+.bar-f .txt{flex:1;min-width:180px}
+.bar-f .txt b{font-weight:600}
+.bar-f .txt small{display:block;opacity:.7;font-size:12px}
+.bar-f .btn{border-color:transparent;background:color-mix(in srgb,var(--bg) 14%,transparent);color:var(--bg)}
+.bar-f .btn:hover{background:color-mix(in srgb,var(--bg) 24%,transparent)}
+.bar-f .btn.primary{background:var(--brand);color:#fff}
+.bar-f.bulk{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.bar-f.bulk .btn{background:var(--surface-2);color:var(--ink);border-color:var(--line)}
+.bar-f.bulk .btn:hover{background:var(--surface-3)}
+.bar-f select.sel{height:32px;font-size:13px}
+
+/* DRAWER */
+.scrim{position:fixed;inset:0;background:rgba(10,14,22,.4);z-index:50;opacity:0;pointer-events:none;transition:opacity .18s}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;z-index:55;top:50%;left:50%;width:min(1180px,96vw);height:min(94vh,960px);background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(10,14,22,.35);display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translate(-50%,-48%) scale(.98);transition:transform .2s cubic-bezier(.2,.8,.2,1),opacity .18s;color:var(--ink);overflow:hidden}
+.drawer.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+.dr-head{display:flex;gap:14px;align-items:center;padding:20px 22px;border-bottom:1px solid var(--line)}
+.dr-head .av{width:48px;height:48px;font-size:18px}
+.dr-head h2{margin:0;font-size:18px;line-height:1.3;font-weight:600}
+.dr-head small{color:var(--ink-3)}
+.dr-head .icon-btn{margin-left:auto;align-self:flex-start}
+.dr-body{flex:1;overflow:auto;padding:4px 22px 24px}
+body.dr-open #changeBar,body.dr-open #bulkBar{display:none!important}
+@media (min-width:980px){
+  .dr-body{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);column-gap:28px;grid-template-rows:auto 1fr;align-items:start}
+  .dr-body>.sec{border-bottom:0}
+  .dr-body>.sec:nth-child(1){grid-column:1;grid-row:1;border-bottom:1px solid var(--line)}
+  .dr-body>.sec:nth-child(2){grid-column:1;grid-row:2}
+  .dr-body>.sec:nth-child(3){grid-column:2;grid-row:1/span 2;border-left:1px solid var(--line);padding-left:24px}
+  .pm-list{max-height:none}
+}
+.sec{padding:18px 0;border-bottom:1px solid var(--line)}
+.sec:last-child{border-bottom:0}
+.sec h3{margin:0 0 12px;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sec h3 small{font-weight:400;color:var(--ink-3);font-size:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);margin-bottom:5px}
+.field label .req{color:var(--danger)}
+.field input,.field select{width:100%;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:0 11px}
+.field select{padding-right:30px}
+.field input:focus,.field select:focus{outline:none;border-color:var(--brand)}
+.field input[readonly]{background:var(--surface-2);color:var(--ink-2);cursor:not-allowed}
+.field .err{color:var(--danger);font-size:12px;margin-top:4px;display:none}
+.field.bad input{border-color:var(--danger)}
+.field.bad .err{display:block}
+.pw{position:relative}
+.pw input{padding-right:38px;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.pw button{position:absolute;right:4px;top:3px;width:32px;height:32px;border:0;background:none;color:var(--ink-3);display:grid;place-items:center;cursor:pointer;border-radius:6px}
+.pw button:hover{color:var(--ink);background:var(--surface-3)}
+.note{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--ink-3);margin:10px 0 0}
+.note svg{margin-top:2px;width:14px;height:14px}
+.sysrole{border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:10px;overflow:hidden}
+.sysrole summary{list-style:none;display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
+.sysrole summary::-webkit-details-marker{display:none}
+.sysrole summary .nm{display:flex;align-items:center;gap:8px;font-weight:600;flex:1;min-width:0}
+.sysrole summary .nm i{width:10px;height:10px;border-radius:3px;background:var(--c);flex:none}
+.sysrole summary .nm small{font-weight:400;color:var(--ink-3)}
+.sysrole summary .chev{color:var(--ink-3);transition:transform .15s}
+.sysrole[open] summary .chev{transform:rotate(180deg)}
+.sysrole .opts{padding:4px 6px 8px;border-top:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:2px}
+.flags{border-top:1px dashed var(--line);margin:0 6px;padding:10px 6px 12px;display:grid;gap:8px}
+.flags label{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.flags label b{color:var(--ink);font-weight:600}
+.flags input{margin-top:3px}
+.flags.off{opacity:.5;pointer-events:none}
+.dr-foot{display:flex;gap:8px;justify-content:space-between;padding:14px 22px;border-top:1px solid var(--line);background:var(--surface)}
+
+/* MODAL */
+.modal{position:fixed;inset:0;z-index:70;display:none;place-items:center;padding:20px}
+.modal.open{display:grid}
+.modal .scrim{opacity:1;pointer-events:auto;z-index:0}
+.dialog{position:relative;z-index:1;background:var(--surface);color:var(--ink);border-radius:var(--r-lg);border:1px solid var(--line);width:min(640px,100%);max-height:min(86vh,780px);display:flex;flex-direction:column;box-shadow:var(--shadow-pop)}
+.dialog.wide{width:min(860px,100%)}
+.dialog.narrow{width:min(440px,100%)}
+.dialog header{padding:18px 22px;border-bottom:1px solid var(--line)}
+.dialog header h2{margin:0 0 2px;font-size:18px;font-weight:600}
+.dialog header p{margin:0;color:var(--ink-2);font-size:13px}
+.dialog .body{overflow:auto;padding:16px 22px}
+.dialog footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:14px 22px;border-top:1px solid var(--line)}
+.dialog footer .left{margin-right:auto;font-size:12.5px;color:var(--ink-2)}
+.diff{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.diff:last-child{border-bottom:0}
+.diff .ch{display:flex;flex-direction:column;gap:4px}
+.diff .ch div{display:flex;align-items:center;gap:6px;font-size:12.5px;justify-content:flex-end}
+.diff .ch .sysl{color:var(--ink-3);min-width:84px;text-align:right}
+.diff .ch s{color:var(--ink-3)}
+.diff .ch .bad{color:var(--danger);font-size:11.5px}
+.diff .undo{border:0;background:none;color:var(--ink-3);padding:2px;border-radius:4px;cursor:pointer}
+.diff .undo:hover{color:var(--danger)}
+
+/* กำหนดสิทธิ์ทั้งแผนก */
+.dept-pick{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:16px}
+.dept-pick .field{flex:1 1 260px}
+.dept-pick .field select{max-width:none}
+.dept-count{font-size:13px;color:var(--ink-2);padding-bottom:9px}
+.dept-count b{font-size:20px;color:var(--ink);font-weight:600}
+.drow{display:grid;grid-template-columns:150px 1fr 220px;gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.drow .nm{display:flex;align-items:center;gap:8px;font-weight:600}
+.drow .nm i{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.drow .now{display:flex;flex-wrap:wrap;gap:4px}
+.mini{font-size:11.5px;border-radius:5px;padding:1px 7px;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.mini.lvl{background:color-mix(in srgb,var(--c) 12%,transparent);color:color-mix(in srgb,var(--c) 85%,var(--ink))}
+.mini.unset{background:var(--danger-soft);color:var(--danger)}
+.drow select.sel{width:100%;max-width:none}
+.drow select.sel.set{border-color:var(--brand);background-color:var(--brand-soft);font-weight:600}
+/* สิทธิ์รายข้อทั้งแผนก */
+.dpp{margin-top:18px;border-top:2px solid var(--line);padding-top:14px}
+.dpp-h{display:flex;flex-direction:column;gap:2px;margin-bottom:10px}
+.dpp-h span{font-size:12.5px;color:var(--ink-3)}
+.dpp-top{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:8px}
+.dpp-top .field{flex:1 1 220px}
+.dpp-top .field select{max-width:none}
+.dpp-top .pm-seg button{white-space:nowrap}
+.dpp .pm-dates{margin-bottom:8px}
+.dpp-row{display:grid;grid-template-columns:1fr 210px;gap:12px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.dpp-row small{display:block;color:var(--ink-3);font-size:11.5px}
+.dpp-row select.sel{width:100%;max-width:none}
+.dpp-row select.sel.set{border-color:var(--brand);background-color:var(--brand-soft);font-weight:600}
+.dpp-foot{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
+.dpp-foot .preview{margin:0;flex:1 1 260px}
+.opt-line{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:12px 14px;border-radius:var(--r-md);background:var(--surface-2);font-size:13px;color:var(--ink-2);cursor:pointer}
+.opt-line b{color:var(--ink);font-weight:600;display:block}
+.opt-line input{margin-top:3px}
+.preview{margin-top:14px;font-size:13px;color:var(--ink-2);display:flex;gap:8px;align-items:flex-start}
+.preview svg{margin-top:2px;color:var(--brand)}
+.preview.zero svg{color:var(--ink-3)}
+
+/* ผู้อนุมัติเคลมตามยี่ห้อ */
+table.rules{width:100%;border-collapse:collapse;font-size:13px}
+.rules th{text-align:left;font-weight:600;color:var(--ink-2);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.rules td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.rules tr.off td{opacity:.5}
+.rules small{display:block;color:var(--ink-3);font-size:12px}
+.br-top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+.br-top span{color:var(--ink-2);font-size:13px}
+.rules tr.editing td{background:var(--brand-soft)}
+.rule-form.hide{display:none}
+.care-list{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.care-row{display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.care-row .nm{flex:1;font-size:14px;color:var(--ink)} .care-row .nm small{display:block;color:var(--ink-3);font-size:12px;margin-top:1px}
+.care-row .nm small.warn{color:var(--warn)}
+.sw{position:relative;width:40px;height:22px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;cursor:pointer;margin:0}
+.sw span{position:absolute;inset:0;border-radius:999px;background:var(--line);transition:background .15s}
+.sw span::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked+span{background:var(--brand)} .sw input:checked+span::after{transform:translateX(18px)}
+.sw input:focus-visible+span{outline:2px solid var(--brand);outline-offset:2px}
+.rule-form{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:var(--r-md)}
+.rule-form h4{margin:0 0 12px;font-size:14px;font-weight:600}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer}
+
+/* TOAST */
+.toasts{position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:16px;z-index:90;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100% - 32px))}
+.toast{display:flex;gap:10px;align-items:flex-start;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:10px;padding:11px 12px 11px 13px;box-shadow:var(--shadow-pop);animation:tin .2s ease-out}
+.toast.warn{border-left-color:var(--warn)} .toast.error{border-left-color:var(--danger)}
+.toast svg{margin-top:2px;color:var(--ok)} .toast.warn svg{color:var(--warn)} .toast.error svg{color:var(--danger)}
+.toast b{display:block;font-weight:600;font-size:13px}
+.toast span{font-size:12.5px;color:var(--ink-2)}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}}
+
+@media (max-width:1280px){.cover{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:767px){.page{padding:18px 14px}}
+@media (max-width:620px){
+  .cover{grid-template-columns:1fr}
+  .grid2,.sysrole .opts{grid-template-columns:1fr}
+  .drow{grid-template-columns:1fr}
+  .head h1{font-size:21px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ===== Permission รายข้อ (เพิ่มใน drawer เดิม) ===== */
+.pm-warn{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:9px;background:var(--warn-soft);color:var(--warn);font-size:13px;margin-bottom:10px}
+.pm-warn svg{flex:none;margin-top:2px}
+.pm-nav{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.pm-nav button{height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);font-size:12.5px;cursor:pointer}
+.pm-nav button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
+.pm-nav button i{font-style:normal;margin-left:5px;color:var(--warn);font-weight:700}
+.pm-list{border:1px solid var(--line);border-radius:10px;overflow:visible}
+.pm-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+.pm-row:last-child{border-bottom:0}
+.pm-row.pend{background:var(--warn-soft)}
+.pm-row b{font-weight:500;font-size:13.5px}
+.pm-row small{display:block;color:var(--ink-3);font-size:11.5px}
+.pm-sw{width:36px;height:20px;border-radius:10px;border:0;background:var(--line-strong);position:relative;cursor:pointer;flex:none}
+.pm-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.pm-sw[aria-checked="true"]{background:var(--ok)}
+.pm-sw[aria-checked="true"]::after{transform:translateX(16px)}
+.pm-b{font-size:11.5px;padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--ink-3);white-space:nowrap}
+.pm-b.add{color:var(--ok);border-color:var(--ok)}
+.pm-b.rem{color:var(--danger);border-color:var(--danger)}
+.pm-b.pend{color:var(--warn);border-color:var(--warn)}
+.pm-sys{display:inline-block;font-size:11px;padding:0 6px;border-radius:4px;background:var(--surface-2);color:var(--ink-2);margin-right:6px}
+.pm-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:10px;position:sticky;bottom:0;background:var(--surface);padding:10px 0;z-index:2}
+.pm-bar span{margin-right:auto;font-size:12.5px;color:var(--warn)}
+.pm-seg{display:flex;gap:6px;margin:8px 0}
+.pm-seg button{flex:1;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);cursor:pointer}
+.pm-seg button[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft);color:var(--brand);font-weight:600}
+.pm-dates{display:none;gap:8px}
+.pm-dates input,.pm-why{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);color:var(--ink)}
+</style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row antialiased">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16m0-4a9 9 0 0 1 15.5-6.2L21 8M21 3v5h-5M3 21v-5h5"/></symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="m8 9 4-4 4 4M8 15l4 4 4-4"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 5.1A9.8 9.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-group" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></symbol>
+</svg>
+
+<!-- Sidebar (menu.js render ลงที่นี่) -->
+<aside id="sidebar-container" class="hidden md:block h-screen sticky top-0 shrink-0"></aside>
+
+<!-- Mobile header + drawer เมนู (เหมือนหน้าอื่น) -->
+<header class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50">
+  <div class="flex items-center gap-2">
+    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden"><span class="text-white font-black text-[9px] tracking-tighter">KTW</span></div>
+    <h2 class="text-sm font-semibold text-slate-950">KTW Inventory System</h2>
+  </div>
+  <button onclick="toggleMobileMenu()" class="p-1 rounded-lg text-slate-600 hover:bg-slate-50"><span id="mobileMenuBtn" style="font-size:20px;line-height:1">☰</span></button>
+</header>
+<div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+  <div onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/40"></div>
+  <div class="fixed top-0 bottom-0 left-0 w-64 bg-white shadow-2xl flex flex-col"><div id="mobile-sidebar-content" class="h-full"></div></div>
+</div>
+
+<main class="page">
+  <header class="head">
+    <div>
+      <h1>จัดการผู้ใช้และสิทธิ์</h1>
+      <p>ข้อมูลพนักงานใช้ร่วมกันทุกระบบ ส่วนสิทธิ์แยกตามระบบ คลิกที่ช่องสิทธิ์เพื่อเปลี่ยน แล้วกดบันทึกครั้งเดียว</p>
+      <span class="sync" id="syncInfo"><i></i>กำลังโหลดข้อมูล…</span>
+    </div>
+    <div class="actions">
+      <button class="btn hide" type="button" id="btnBrandRules"><svg class="i"><use href="#i-tag"/></svg>ผู้อนุมัติเคลมตามยี่ห้อ</button>
+      <button class="btn" type="button" id="btnReload"><svg class="i"><use href="#i-sync"/></svg>โหลดข้อมูลใหม่</button>
+      <button class="btn primary" type="button" id="btnAdd"><svg class="i"><use href="#i-plus"/></svg>เพิ่มพนักงาน</button>
+    </div>
+  </header>
+
+  <section class="cover" id="cover" aria-label="ภาพรวมสิทธิ์แต่ละระบบ"></section>
+
+  <section class="panel" aria-label="รายชื่อพนักงาน">
+    <div class="tools">
+      <label class="search">
+        <span class="sr-only">ค้นหา</span>
+        <svg class="i"><use href="#i-search"/></svg>
+        <input id="q" type="search" placeholder="ค้นหารหัส ชื่อ ชื่อเล่น อีเมล หรือแผนก" autocomplete="off">
+        <kbd>/</kbd>
+      </label>
+      <select class="sel" id="fDept" aria-label="แผนก"></select>
+      <button class="toggle" id="fSpecial" aria-pressed="false" type="button">มีสิทธิ์มากกว่า Staff</button>
+      <button class="toggle" id="fNoMail" aria-pressed="false" type="button"><svg class="i"><use href="#i-mail"/></svg>ยังไม่มีอีเมล</button>
+      <span class="divider" aria-hidden="true"></span>
+      <button class="btn" id="btnDeptBulk" type="button"><svg class="i"><use href="#i-group"/></svg>กำหนดสิทธิ์ทั้งแผนก</button>
+      <span class="grow"></span>
+      <select class="sel" id="pageSize" aria-label="จำนวนต่อหน้า">
+        <option value="25">25 ต่อหน้า</option><option value="50" selected>50 ต่อหน้า</option><option value="100">100 ต่อหน้า</option>
+      </select>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="tablewrap"><table class="emp"><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+    <div class="foot"><span id="count" class="num"></span><nav class="pager" id="pager" aria-label="หน้า"></nav></div>
+  </section>
+
+  <div class="dock">
+    <div class="bar-f bulk" id="bulkBar">
+      <div class="txt"><b id="bulkN">0</b> คนที่เลือก<small>กำหนดสิทธิ์ให้ทุกคนที่เลือกพร้อมกัน</small></div>
+      <select class="sel" id="bulkSys" aria-label="ระบบ"></select>
+      <select class="sel" id="bulkRole" aria-label="บทบาท"></select>
+      <button class="btn sm" type="button" id="bulkApply">ใช้กับที่เลือก</button>
+      <button class="icon-btn" type="button" id="bulkClear" aria-label="ยกเลิกการเลือก"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="bar-f" id="changeBar">
+      <div class="txt"><b id="chN">0</b> การเปลี่ยนแปลงยังไม่บันทึก<small id="chSub"></small></div>
+      <button class="btn sm" type="button" id="chDiscard">ยกเลิกทั้งหมด</button>
+      <button class="btn sm" type="button" id="chReview">ตรวจทาน</button>
+      <button class="btn sm primary" type="button" id="chSave">บันทึกสิทธิ์</button>
+    </div>
+  </div>
+</main>
+
+<div class="pop" id="pop" role="menu"></div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="รายละเอียดพนักงาน" aria-hidden="true"></aside>
+
+<!-- ตรวจทานก่อนบันทึก -->
+<div class="modal" id="mReview" role="dialog" aria-modal="true" aria-labelledby="rvTitle">
+  <div class="scrim" data-close></div>
+  <div class="dialog">
+    <header><h2 id="rvTitle">ตรวจทานก่อนบันทึก</h2><p id="rvSub"></p></header>
+    <div class="body" id="rvBody"></div>
+    <footer><button class="btn" type="button" data-close>กลับไปแก้ไข</button><button class="btn primary" type="button" id="rvSave">บันทึกสิทธิ์</button></footer>
+  </div>
+</div>
+
+
+<!-- บันทึกสิทธิ์รายข้อ -->
+<div class="modal" id="mPerm" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+  <div class="scrim" data-close></div>
+  <div class="dialog">
+    <header><h2 id="pmTitle">ตรวจทานก่อนบันทึก Role และสิทธิ์</h2><p id="pmSub"></p></header>
+    <div class="body">
+      <div id="pmList"></div>
+      <div id="pmDurBox">
+        <label style="font-size:13px;font-weight:600">ระยะเวลาของสิทธิ์เฉพาะคน</label>
+        <div class="pm-seg"><button type="button" data-pmd="perm" aria-pressed="true">ถาวรจนกว่าจะถอน</button><button type="button" data-pmd="range" aria-pressed="false">กำหนดช่วงเวลา</button></div>
+        <div class="pm-dates" id="pmDates"><input type="date" id="pmD1" aria-label="วันเริ่ม (ไม่บังคับ)"><input type="date" id="pmD2" aria-label="วันสุดท้าย"></div>
+      </div>
+      <label for="pmWhy" style="font-size:13px;font-weight:600;display:block;margin-top:10px">หมายเหตุ (ไม่บังคับ)</label>
+      <input class="pm-why" id="pmWhy" maxlength="200" placeholder="เช่น ช่วยงานแทนระหว่างลา">
+    </div>
+    <footer><button class="btn" type="button" data-close>กลับไปแก้ไข</button><button class="btn primary" type="button" id="pmSave">บันทึกสิทธิ์รายข้อ</button></footer>
+  </div>
+</div>
+
+<!-- กำหนดสิทธิ์ทั้งแผนก -->
+<div class="modal" id="mDept" role="dialog" aria-modal="true" aria-labelledby="dpTitle">
+  <div class="scrim" data-close></div>
+  <div class="dialog wide">
+    <header><h2 id="dpTitle">กำหนดสิทธิ์ทั้งแผนก</h2><p>เลือกแผนก แล้วเลือกสิทธิ์เฉพาะระบบที่ต้องการเปลี่ยน ระบบที่เลือก “ไม่เปลี่ยน” จะคงค่าเดิม</p></header>
+    <div class="body">
+      <div class="dept-pick">
+        <div class="field"><label for="dpDept">แผนก</label><select class="sel" id="dpDept"></select></div>
+        <div class="dept-count"><b class="num" id="dpN">0</b> คนในแผนกนี้</div>
+      </div>
+      <div id="dpRows"></div>
+      <!-- 🆕 สิทธิ์รายข้อ (Permission) ทั้งแผนก — บันทึกทันที (ไม่ผ่านรายการรอบันทึกของ Role) -->
+      <div class="dpp" id="dpPerm">
+        <div class="dpp-h"><b>สิทธิ์รายข้อ (Permission) ทั้งแผนก</b><span>ตั้งครั้งเดียวให้ทุกคนในแผนกที่เลือก ใช้เป็นสิทธิ์เฉพาะคน (ทับค่าตาม Role) และบันทึกทันทีเมื่อกดปุ่มด้านล่าง</span></div>
+        <div class="dpp-top">
+          <div class="field"><label for="dpPSys">หมวดสิทธิ์</label><select class="sel" id="dpPSys"></select></div>
+          <div class="pm-seg" id="dpPDur"><button type="button" data-dpd="perm" aria-pressed="true">ถาวรจนกว่าจะถอน</button><button type="button" data-dpd="range" aria-pressed="false">กำหนดช่วงเวลา</button></div>
+        </div>
+        <div class="pm-dates" id="dpPDates"><input type="date" id="dpPD1" aria-label="วันเริ่ม (ไม่บังคับ)"><input type="date" id="dpPD2" aria-label="วันสุดท้าย"></div>
+        <div id="dpPRows"></div>
+        <input class="pm-why" id="dpPWhy" maxlength="200" placeholder="หมายเหตุ (ไม่บังคับ) เช่น ปรับสิทธิ์ทั้งแผนกตามนโยบายใหม่">
+        <div class="dpp-foot"><p class="preview" id="dpPPreview"></p><button class="btn primary" type="button" id="dpPApply" disabled>บันทึกสิทธิ์รายข้อทั้งแผนก</button></div>
+      </div>
+      <label class="opt-line"><input type="checkbox" class="ck" id="dpSafe" checked>
+        <span><b>ไม่แตะคนที่มีสิทธิ์พิเศษอยู่แล้ว</b>เปลี่ยนเฉพาะคนที่เป็น Staff หรือยังไม่กำหนดสิทธิ์ เช่น Admin หรือผู้อนุมัติในแผนกจะคงสิทธิ์เดิม</span></label>
+      <p class="preview" id="dpPreview"></p>
+    </div>
+    <footer><span class="left" id="dpLeft"></span><button class="btn" type="button" data-close>ยกเลิก</button><button class="btn primary" type="button" id="dpApply">เพิ่มเข้ารายการรอบันทึก</button></footer>
+  </div>
+</div>
+
+<!-- เพิ่มพนักงาน -->
+<div class="modal" id="mAdd" role="dialog" aria-modal="true" aria-labelledby="adTitle">
+  <div class="scrim" data-close></div>
+  <form class="dialog" id="addForm" novalidate>
+    <header><h2 id="adTitle">เพิ่มพนักงาน</h2><p>บัญชีใหม่จะใช้ได้ทุกระบบ สิทธิ์ตั้งตอนนี้หรือภายหลังก็ได้</p></header>
+    <div class="body">
+      <div class="grid2">
+        <div class="field" id="fAddId"><label for="nId">รหัสพนักงาน <span class="req">*</span></label><input id="nId" inputmode="numeric" maxlength="10" placeholder="เช่น 13125" autocomplete="off"><p class="err"></p></div>
+        <div class="field" id="fAddPass"><label for="nPass">รหัสผ่านเริ่มต้น <span class="req">*</span></label><input id="nPass" type="password" minlength="4" placeholder="อย่างน้อย 4 ตัวอักษร" autocomplete="new-password"><p class="err"></p></div>
+        <div class="field" id="fAddName" style="grid-column:1/-1"><label for="nName">ชื่อ-นามสกุล <span class="req">*</span></label><input id="nName" placeholder="ชื่อและนามสกุลภาษาไทย"><p class="err"></p></div>
+        <div class="field"><label for="nNick">ชื่อเล่น</label><input id="nNick" maxlength="50"></div>
+        <div class="field" id="fAddEmail"><label for="nEmail">อีเมล <span class="req">*</span></label><input id="nEmail" type="email" placeholder="name@ktw.co.th"><p class="err"></p></div>
+        <div class="field" id="fAddDep" style="grid-column:1/-1"><label for="nDep">แผนก <span class="req">*</span></label><select class="sel" id="nDep" style="max-width:none"></select><p class="err"></p></div>
+      </div>
+      <div class="grid2" id="nRoles" style="margin-top:16px"></div>
+    </div>
+    <footer><button class="btn" type="button" data-close>ยกเลิก</button><button class="btn primary" type="submit" id="addSave">เพิ่มพนักงาน</button></footer>
+  </form>
+</div>
+
+<!-- ผู้อนุมัติเคลมตามยี่ห้อ -->
+<div class="modal" id="mBrand" role="dialog" aria-modal="true" aria-labelledby="brTitle">
+  <div class="scrim" data-close></div>
+  <div class="dialog wide">
+    <header><h2 id="brTitle">ผู้อนุมัติเคลมตามยี่ห้อ</h2><p>ยี่ห้อที่ไม่มีกติกา ใช้เจ้าหน้าที่การตลาดเป็นผู้อนุมัติ</p></header>
+    <div class="body">
+      <div class="br-top"><span id="brCount"></span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" id="brCare"><svg class="i"><use href="#i-plus"/></svg>เพิ่มผู้ดูแลยี่ห้อสินค้า</button><button class="btn sm primary" type="button" id="brAdd"><svg class="i"><use href="#i-plus"/></svg>เพิ่มยี่ห้อ</button></div></div>
+      <div class="tablewrap"><table class="rules"><thead><tr><th>ยี่ห้อ</th><th>ฝ่ายผู้ดูแลยี่ห้อสินค้า</th><th>หมายเหตุ</th><th>สถานะ</th><th></th></tr></thead><tbody id="brBody"></tbody></table></div>
+      <div class="rule-form hide" id="brForm">
+        <h4 id="brFormTitle">เพิ่มกติกายี่ห้อใหม่</h4>
+        <div class="grid2">
+          <div class="field"><label for="brKey">ยี่ห้อ (ตามชื่อก่อนเครื่องหมาย / ในระบบสินค้า) <span class="req">*</span></label><input id="brKey" maxlength="50" placeholder="เช่น MAKITA"></div>
+          <div class="field"><label for="brRole">ผู้อนุมัติฝ่าย</label><select class="sel" id="brRole" style="max-width:none"></select></div>
+          <div class="field"><label for="brEmp">ระบุเป็นรายบุคคล (เว้นว่าง = ทุกคนในฝ่ายนั้น)</label><input id="brEmp" list="brEmpList" placeholder="พิมพ์รหัสหรือชื่อพนักงาน"><datalist id="brEmpList"></datalist></div>
+          <div class="field"><label for="brNote">หมายเหตุ</label><input id="brNote" maxlength="200"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap">
+          <label class="check"><input type="checkbox" class="ck" id="brActive" checked>เปิดใช้กติกานี้</label>
+          <div style="display:flex;gap:8px"><button class="btn sm" type="button" id="brCancel">ยกเลิก</button><button class="btn sm primary" type="button" id="brSave">บันทึกกติกา</button></div>
+        </div>
+      </div>
+    </div>
+    <footer><button class="btn" type="button" data-close>ปิด</button></footer>
+  </div>
+</div>
+
+<!-- ผู้ดูแลยี่ห้อสินค้า -->
+<div class="modal" id="mCare" role="dialog" aria-modal="true" aria-labelledby="careTitle">
+  <div class="scrim" data-close></div>
+  <div class="dialog narrow" style="width:min(520px,100%)">
+    <header><h2 id="careTitle">ผู้ดูแลยี่ห้อสินค้า</h2><p>เลือกฝ่ายที่ดูแลสินค้า ฝ่ายที่เปิดจะไปแสดงในช่อง “ผู้อนุมัติฝ่าย” ของกติกายี่ห้อ</p></header>
+    <div class="body">
+      <div style="font-weight:600;font-size:13px;color:var(--ink-2)">ฝ่ายที่ดูแลสินค้า</div>
+      <div class="care-list" id="careList"></div>
+    </div>
+    <footer><button class="btn" type="button" data-close>ยกเลิก</button><button class="btn primary" type="button" id="careSave">บันทึก</button></footer>
+  </div>
+</div>
+
+<!-- ยืนยัน (ใช้ร่วม) -->
+<div class="modal" id="mAsk" role="alertdialog" aria-modal="true" aria-labelledby="askTitle">
+  <div class="scrim"></div>
+  <div class="dialog narrow">
+    <header><h2 id="askTitle"></h2></header>
+    <div class="body" id="askBody" style="color:var(--ink-2)"></div>
+    <footer><button class="btn" type="button" id="askNo">ยกเลิก</button><button class="btn primary" type="button" id="askYes">ยืนยัน</button></footer>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- ไฟล์กลางของระบบ: api.js (n8nFetch + API Key) และ menu.js (sidebar) ต้องอยู่โฟลเดอร์เดียวกับหน้านี้ -->
+    <!-- แกนกลางระบบ KTW HUB -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- โมดูล Service ของ employees.html (Logic แยกจาก HTML) -->
+    <script src="../modules/employeeService.js"></script>
+</body>
+</html>

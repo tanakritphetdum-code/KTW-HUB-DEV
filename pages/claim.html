@@ -1,0 +1,1351 @@
+﻿<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ระบบเคลมสินค้าลูกค้า - KTW Inventory System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+      if (!sessionStorage.getItem("emp_id")) {
+        window.location.href = "../index.html";
+      }
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: { sans: ["Prompt", "sans-serif"] },
+            colors: {
+              brand: {
+                50: "#fff7ed",
+                100: "#ffedd5",
+                500: "#f97316",
+                600: "#ea580c",
+                700: "#c2410c",
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .modal-transition {
+        transition:
+          transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+          opacity 0.15s ease-out;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col md:flex-row antialiased"
+  >
+    <aside
+      id="sidebar-container"
+      class="hidden md:block h-screen sticky top-0 shrink-0"
+    ></aside>
+
+    <header
+      class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50"
+    >
+      <div class="flex items-center gap-2">
+        <div
+          class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden"
+        >
+          <span class="text-white font-black text-[9px] tracking-tighter">KTW</span>
+        </div>
+        <h2 class="text-sm font-semibold text-slate-950">
+          KTW Inventory System
+        </h2>
+      </div>
+      <button
+        onclick="toggleMobileMenu()"
+        class="p-1 rounded-lg text-slate-600 hover:bg-slate-50"
+      >
+        <i id="mobileMenuBtn" data-lucide="menu" class="w-6 h-6"></i>
+      </button>
+    </header>
+
+    <div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+      <div
+        onclick="toggleMobileMenu()"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"
+      ></div>
+      <div
+        class="fixed top-0 bottom-0 left-0 w-64 bg-white shadow-2xl flex flex-col"
+      >
+        <div id="mobile-sidebar-content" class="h-full"></div>
+      </div>
+    </div>
+
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5"
+      >
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-slate-900">
+            ระบบเคลมสินค้าลูกค้า
+          </h1>
+          <p class="text-sm text-slate-500">
+            รับเรื่องเคลม / ซ่อมสินค้าจากลูกค้า ส่งให้การตลาดพิจารณา
+            และติดตามจนปิดงาน (F-16-E01)
+          </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">
+        <button
+          id="monthlyReportBtn"
+          onclick="openMonthlyReportModal()"
+          class="hidden inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 h-11 px-5 active:scale-[0.98] transition-all"
+        >
+          <i data-lucide="file-bar-chart" class="w-4 h-4"></i>
+          รายงานประจำเดือน
+        </button>
+        <button
+          id="btnNewDoc"
+          onclick="openNewDocModal()"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium bg-brand-500 text-white hover:bg-brand-600 h-11 px-5 shadow-md shadow-brand-500/10 hover:shadow-brand-500/20 active:scale-[0.98] transition-all"
+        >
+          <i data-lucide="clipboard-plus" class="w-4 h-4"></i>
+          สร้างเอกสารเคลม
+        </button>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+          <h3 class="text-sm font-semibold text-slate-600">
+            ประวัติเอกสารเคลมสินค้าลูกค้า
+          </h3>
+          <div class="flex items-center gap-3 flex-wrap">
+            <button
+              onclick="resetDocFilters()"
+              id="resetDocFiltersBtn"
+              class="hidden text-xs font-semibold text-orange-600 hover:text-orange-700 inline-flex items-center gap-1 transition-colors"
+            >
+              <i data-lucide="x" class="w-3 h-3"></i>
+              ล้างตัวกรองทั้งหมด
+            </button>
+            <button
+              onclick="fetchAllDocuments()"
+              id="syncHistoryBtn"
+              class="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-orange-600 transition-colors"
+            >
+              <i
+                data-lucide="refresh-cw"
+                class="w-3.5 h-3.5"
+                id="syncHistoryIcon"
+              ></i>
+              ซิงค์สถานะล่าสุด
+            </button>
+          </div>
+        </div>
+        <div
+          class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm"
+        >
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[1200px]">
+              <thead>
+                <tr
+                  class="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500"
+                >
+                  <th class="p-4 w-40">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('DocId')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>เลขที่เอกสาร</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="DocId"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'DocId')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="DocId"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-36">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('DocDate')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>วันที่</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="DocDate"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'DocDate')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="DocDate"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-32">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('Purpose')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>วัตถุประสงค์</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="Purpose"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'Purpose')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="Purpose"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('CustomerName')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span class="whitespace-nowrap">ร้าน / ลูกค้า</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="CustomerName"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'CustomerName')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="CustomerName"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-40">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('RepairOrderNo')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span class="whitespace-nowrap">เลขที่ใบสั่งซ่อม</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="RepairOrderNo"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'RepairOrderNo')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="RepairOrderNo"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-32">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('CreatedByEmpId')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span class="whitespace-nowrap">รหัสพนักงาน</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="CreatedByEmpId"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'CreatedByEmpId')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="CreatedByEmpId"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-40">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('CreatedByName')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span class="whitespace-nowrap">ผู้รับเรื่อง</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="CreatedByName"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'CreatedByName')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="CreatedByName"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 w-56">
+                    <div class="flex items-center gap-1">
+                      <button
+                        onclick="sortDocBy('StatusLabel')"
+                        class="flex items-center gap-1 hover:text-orange-600 transition-colors"
+                      >
+                        <span>สถานะ</span>
+                        <i
+                          data-lucide="chevrons-up-down"
+                          class="w-3.5 h-3.5 text-slate-400 sort-icon"
+                          data-col="StatusLabel"
+                        ></i>
+                      </button>
+                      <button
+                        onclick="toggleDocFilterDropdown(event, 'StatusLabel')"
+                        class="filter-toggle-btn h-6 w-6 shrink-0 flex items-center justify-center rounded-md hover:bg-slate-200/60 text-slate-400 transition-colors"
+                        data-filter-col="StatusLabel"
+                        title="กรองข้อมูล"
+                      >
+                        <i data-lucide="list-filter" class="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  </th>
+                  <th class="p-4 text-right w-36">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody
+                id="docTableBody"
+                class="divide-y divide-slate-100 text-sm"
+              >
+                <tr>
+                  <td
+                    colspan="9"
+                    class="px-4 py-8 text-center text-sm text-slate-400"
+                  >
+                    กำลังโหลดข้อมูล...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Dropdown Filter ของแต่ละคอลัมน์ (position:fixed กันโดนตัดขอบจาก overflow-x-auto) -->
+    <div
+      id="filter-dropdown-DocId"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >ค้นหาเลขที่เอกสาร</label
+      >
+      <input
+        type="text"
+        id="filter-DocId"
+        oninput="onDocFilterChange()"
+        placeholder="พิมพ์เพื่อค้นหา..."
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      />
+    </div>
+    <div
+      id="filter-dropdown-DocDate"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >เลือกวันที่</label
+      >
+      <input
+        type="date"
+        id="filter-DocDate"
+        onchange="
+          onDocFilterChange();
+          closeAllDocFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      />
+    </div>
+    <div
+      id="filter-dropdown-Purpose"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-52 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >วัตถุประสงค์</label
+      >
+      <select
+        id="filter-Purpose"
+        onchange="
+          onDocFilterChange();
+          closeAllDocFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+        <option value="CLAIM">เคลมสินค้า</option>
+        <option value="REPAIR">ซ่อมเคลมสินค้า</option>
+      </select>
+    </div>
+    <div
+      id="filter-dropdown-CustomerName"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >ค้นหาร้าน / ลูกค้า</label
+      >
+      <input
+        type="text"
+        id="filter-CustomerName"
+        oninput="onDocFilterChange()"
+        placeholder="พิมพ์เพื่อค้นหา..."
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      />
+    </div>
+    <div
+      id="filter-dropdown-RepairOrderNo"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >ค้นหาเลขที่ใบสั่งซ่อม</label
+      >
+      <input
+        type="text"
+        id="filter-RepairOrderNo"
+        oninput="onDocFilterChange()"
+        placeholder="พิมพ์เพื่อค้นหา..."
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      />
+    </div>
+    <div
+      id="filter-dropdown-CreatedByEmpId"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-52 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >รหัสพนักงาน</label
+      >
+      <select
+        id="filter-CreatedByEmpId"
+        onchange="
+          onDocFilterChange();
+          closeAllDocFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
+    <div
+      id="filter-dropdown-CreatedByName"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-52 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >ผู้รับเรื่อง</label
+      >
+      <select
+        id="filter-CreatedByName"
+        onchange="
+          onDocFilterChange();
+          closeAllDocFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+      </select>
+    </div>
+    <div
+      id="filter-dropdown-StatusLabel"
+      class="doc-filter-dropdown hidden fixed z-40 bg-white border border-slate-200 rounded-xl shadow-xl p-3 w-56 text-xs"
+    >
+      <label
+        class="text-[10px] font-semibold text-slate-400 uppercase block mb-1.5"
+        >สถานะ</label
+      >
+      <select
+        id="filter-StatusLabel"
+        onchange="
+          onDocFilterChange();
+          closeAllDocFilterDropdowns();
+        "
+        class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs font-normal text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-100 focus:border-orange-400 transition-all"
+      >
+        <option value="">ทั้งหมด</option>
+        <option value="รอเจ้าหน้าที่การตลาด">รอเจ้าหน้าที่การตลาด</option>
+        <option value="รอผู้บริหารอนุมัติ">รอผู้บริหารอนุมัติ</option>
+        <option value="รอเอกสารเพิ่มเติม">รอเอกสารเพิ่มเติม (รอผู้สร้างแก้ไข)</option>
+        <option value="อนุมัติแล้ว (รอปิดงาน)">อนุมัติแล้ว (รอปิดงาน)</option>
+        <option value="ไม่อนุมัติ (รอปิดงาน)">ไม่อนุมัติ (รอปิดงาน)</option>
+        <option value="เสร็จสิ้น (อนุมัติ)">เสร็จสิ้น (อนุมัติ)</option>
+        <option value="เสร็จสิ้น (ไม่อนุมัติ)">เสร็จสิ้น (ไม่อนุมัติ)</option>
+        <option value="ยกเลิก">ยกเลิก</option>
+      </select>
+    </div>
+
+    <!-- ===================== MODAL DOCFLOW ===================== -->
+    <div
+      id="docFlowModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300"
+        id="docFlowModalContent"
+      >
+        <div
+          class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between"
+        >
+          <div class="flex items-center gap-2">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-white shadow-xs"
+            >
+              <i data-lucide="git-branch" class="w-4 h-4"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-950">
+              เส้นทางการเดินเอกสาร (Docflow)
+            </h3>
+          </div>
+          <button
+            onclick="closeDocFlowModal()"
+            class="text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div
+          class="p-6 space-y-6 max-h-[75vh] overflow-y-auto"
+          id="docFlowContent"
+        ></div>
+        <div
+          class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end"
+        >
+          <button
+            onclick="closeDocFlowModal()"
+            class="h-10 px-5 rounded-xl text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors"
+          >
+            ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL PREVIEW เอกสาร ===================== -->
+    <div
+      id="previewDocModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-2 sm:p-4"
+    >
+      <div
+        class="bg-slate-200 rounded-2xl w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300 flex flex-col"
+        style="max-width: 1400px; width: 94vw; max-height: 92vh"
+        id="previewDocModalContent"
+      >
+        <div
+          class="print:hidden flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0"
+        >
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-brand-500"></i>
+            <h3 class="text-sm font-bold text-slate-950">
+              ตัวอย่างเอกสาร (Preview)
+            </h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              onclick="printPreviewDocument()"
+              class="h-9 px-3.5 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5"
+            >
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              พิมพ์เอกสาร
+            </button>
+            <button
+              onclick="closePreviewDocModal()"
+              class="h-9 w-9 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 flex items-center justify-center transition-colors"
+            >
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+        <div class="overflow-y-auto flex-1 p-5 sm:p-8">
+          <div
+            id="previewDocPaper"
+            class="bg-white w-full p-10 sm:p-14 shadow-sm border border-slate-200 text-slate-800 text-base"
+          ></div>
+          <!-- 📎 แถบไฟล์แนบ — วางใต้กระดาษและมี print:hidden เพื่อไม่ให้ปนไปกับฟอร์มตอนสั่งพิมพ์ -->
+          <div
+            id="previewAttachmentBar"
+            class="print:hidden hidden mt-4 bg-white rounded-xl border border-slate-200 p-4 space-y-3"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL CONFIRM ยกเลิกเอกสาร / เรียกคืน ===================== -->
+    <div
+      id="deleteDocModal"
+      class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300"
+        id="deleteDocModalContent"
+      >
+        <div class="p-6 text-center space-y-4">
+          <div
+            id="deleteDocIcon"
+            class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-50 text-red-600 border border-red-100"
+          >
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 id="deleteDocTitle" class="text-sm font-bold text-slate-950">
+              ยืนยันการยกเลิกเอกสารเคลม
+            </h3>
+            <p id="deleteDocMessage" class="text-xs text-slate-500 mt-2">
+              คุณแน่ใจหรือไม่ที่จะยกเลิกเอกสารเลขที่
+              <strong
+                id="deleteDocIdDisplay"
+                class="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded"
+              ></strong>
+              ?
+            </p>
+          </div>
+          <div id="cancelReasonWrap" class="text-left">
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">เหตุผลในการยกเลิก <span class="text-red-500">*</span></label>
+            <textarea id="cancelReasonInput" rows="3" maxlength="300" placeholder="ระบุเหตุผลที่ยกเลิกเอกสาร (จำเป็น)" class="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/30"></textarea>
+          </div>
+          <div class="flex items-center justify-center gap-2 pt-2">
+            <button
+              onclick="closeDeleteDocModal()"
+              class="h-10 px-4 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              ปิดหน้าต่าง
+            </button>
+            <button
+              id="confirmDeleteDocBtn"
+              class="h-10 px-5 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors"
+            >
+              ยืนยันการยกเลิกเอกสาร
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: ถอยสถานะ (ผู้สร้าง / Admin) ===================== -->
+    <div id="revertDocModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300" id="revertDocModalContent">
+        <div class="p-6 space-y-4">
+          <div class="text-center space-y-3">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+              <i data-lucide="undo-2" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-sm font-bold text-slate-950">ถอยสถานะเอกสาร</h3>
+            <p class="text-xs text-slate-500">
+              เอกสารเลขที่ <strong id="revertDocIdDisplay" class="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded"></strong>
+              จะกลับไปที่สถานะ "รอผู้อนุมัติพิจารณา"
+            </p>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">เหตุผลในการถอยสถานะ <span class="text-red-500">*</span></label>
+            <textarea id="revertReasonInput" rows="3" maxlength="300" placeholder="เช่น ระบุรายละเอียดผิด ต้องการแก้ไข (จำเป็น)" class="w-full rounded-xl border border-slate-200 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/30"></textarea>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+            <input type="checkbox" id="revertSendEmail" checked class="accent-brand-500 rounded" />
+            ส่งอีเมลแจ้งผู้อนุมัติให้พิจารณาใหม่
+          </label>
+          <div class="flex items-center justify-center gap-2 pt-1">
+            <button onclick="closeRevertDocModal()" class="h-10 px-4 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">ปิดหน้าต่าง</button>
+            <button id="confirmRevertDocBtn" class="h-10 px-5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-colors">ยืนยันถอยสถานะ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: รายงานประจำเดือน (Admin / SRV) ===================== -->
+    <div id="monthlyReportModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100 transform transition-all scale-95 opacity-0 duration-300" id="monthlyReportModalContent">
+        <div class="px-6 pt-5 pb-3 border-b border-slate-100 flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-950">รายงานประจำเดือน — เคลมสินค้าลูกค้า</h3>
+            <p class="text-[11px] text-slate-500 mt-0.5">สรุปจากประวัติการทำงาน นับตามวันที่สร้างเอกสารในช่วงที่เลือก</p>
+          </div>
+          <button onclick="closeMonthlyReportModal()" class="text-slate-400 hover:text-slate-600 text-lg leading-none" aria-label="ปิด">&times;</button>
+        </div>
+        <div class="p-6 space-y-4 overflow-y-auto">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">เดือน (เติมวันที่ให้อัตโนมัติ)</label>
+              <select id="mrMonth" class="w-full h-10 rounded-xl border border-slate-200 px-2 text-xs"></select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">ตั้งแต่วันที่</label>
+              <input type="date" id="mrFrom" class="w-full h-10 rounded-xl border border-slate-200 px-2 text-xs" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 mb-1">ถึงวันที่</label>
+              <input type="date" id="mrTo" class="w-full h-10 rounded-xl border border-slate-200 px-2 text-xs" />
+            </div>
+          </div>
+          <p id="mrRangeHint" class="text-[11px] text-slate-400">เลือกช่วงได้ไม่เกิน 366 วัน และเลือกวันที่เกินวันนี้ไม่ได้</p>
+
+          <div id="mrPreview" class="rounded-xl bg-slate-50 border border-slate-100 p-3 text-xs text-slate-600">กำลังโหลดตัวอย่างสรุป...</div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-[11px] font-semibold text-slate-600">ผู้รับ (Role SRV) <span class="text-red-500">*</span></label>
+              <div class="flex items-center gap-3 text-[11px]">
+                <span id="mrSelCount" class="text-slate-400"></span>
+                <button type="button" onclick="mrToggleAll(true)" class="text-brand-600 hover:underline">เลือกทั้งหมด</button>
+                <button type="button" onclick="mrToggleAll(false)" class="text-slate-500 hover:underline">ล้าง</button>
+              </div>
+            </div>
+            <input id="mrSearch" oninput="mrRenderRecipients()" placeholder="ค้นหารหัส / ชื่อ / อีเมล" class="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs mb-2" />
+            <div id="mrRecipients" class="max-h-44 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100"></div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">อีเมลเพิ่มเติม (สูงสุด 10 รายการ) — พิมพ์แล้วกด Enter</label>
+            <div id="mrChips" class="flex flex-wrap gap-1.5 mb-1.5"></div>
+            <input id="mrExtra" type="email" placeholder="name@ktw.co.th" class="w-full h-9 rounded-xl border border-slate-200 px-3 text-xs" />
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-600 mb-1">รูปแบบรายงาน</label>
+            <div class="flex flex-col gap-1.5 text-xs text-slate-700">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="mrFormat" value="excel" checked class="accent-brand-500" /> สรุปในอีเมล + แนบ Excel (มีรูปในชีต "เอกสาร")</label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="mrFormat" value="summary" class="accent-brand-500" /> สรุปในอีเมลอย่างเดียว (ไม่แนบไฟล์)</label>
+            </div>
+          </div>
+        </div>
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button onclick="closeMonthlyReportModal()" class="h-10 px-4 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50">ปิดหน้าต่าง</button>
+          <button id="mrSendBtn" onclick="submitMonthlyReport()" class="h-10 px-5 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50">ส่งรายงาน</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: สร้าง/แก้ไขเอกสาร ===================== -->
+    <div
+      id="docModal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/50 backdrop-blur-xs"
+    >
+      <div
+        class="modal-transition bg-white rounded-2xl shadow-2xl w-full max-w-[96vw] max-h-[92vh] flex flex-col"
+      >
+        <div
+          class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0"
+        >
+          <h2 id="docModalTitle" class="text-lg font-bold text-slate-900">
+            สร้างเอกสารเคลมสินค้าลูกค้า
+          </h2>
+          <button
+            onclick="closeDocModal()"
+            class="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="overflow-y-auto px-6 py-5 space-y-6">
+          <input type="hidden" id="editingDocId" value="" />
+
+          <!-- แถบเหตุผลที่ถูกตีกลับ — โชว์เฉพาะตอนเปิดแก้ไขเอกสารที่โดนตีกลับมา -->
+          <div
+            id="rejectReasonBanner"
+            class="hidden rounded-xl border-2 border-red-100 bg-red-50 p-4"
+          >
+            <div class="flex items-start gap-2.5">
+              <i
+                data-lucide="corner-down-left"
+                class="w-4 h-4 text-red-600 mt-0.5 shrink-0"
+              ></i>
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-red-700">
+                  ผู้พิจารณาขอเอกสารเพิ่มเติม — กรุณาแก้ไข/แนบเอกสารแล้วบันทึกเพื่อส่งกลับไปพิจารณาใหม่
+                  <span id="rejectReasonCount" class="font-normal"></span>
+                </p>
+                <p
+                  id="rejectReasonText"
+                  class="text-xs text-red-600 mt-1 leading-relaxed"
+                ></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- แถวที่ 1: วัตถุประสงค์ | เลขที่เอกสาร + วันที่ -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >วัตถุประสงค์</label
+              >
+              <div class="flex flex-wrap items-center gap-4 min-h-10">
+                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="purpose"
+                    value="REPAIR"
+                    checked
+                    class="accent-brand-500"
+                  />
+                  ซ่อมเคลมสินค้า
+                </label>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                  >เลขที่เอกสาร</label
+                >
+                <input
+                  type="text"
+                  id="docId"
+                  readonly
+                  placeholder="ระบบจะสร้างให้อัตโนมัติหลังบันทึก"
+                  class="w-full h-10 px-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm font-mono cursor-not-allowed outline-none"
+                />
+                <p class="text-[10px] text-slate-400 mt-1">
+                  ระบบสร้างเลขที่เอกสารให้อัตโนมัติ กันเลขซ้ำ
+                </p>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                  >วันที่รับเรื่อง</label
+                >
+                <input
+                  type="date"
+                  id="docDate"
+                  class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- แถวที่ 2: ข้อมูลลูกค้า (ชื่อร้าน / เบอร์ติดต่อ / เลขที่ใบสั่งซ่อม) -->
+          <div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr] gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >ชื่อร้าน / ชื่อลูกค้า <span class="text-red-500">*</span></label
+              >
+              <input
+                type="text"
+                id="customerName"
+                placeholder="เช่น ร้านทองดีการช่าง"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >เบอร์ติดต่อ</label
+              >
+              <input
+                type="text"
+                id="customerPhone"
+                placeholder="08x-xxx-xxxx"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >เลขที่ใบสั่งซ่อม</label
+              >
+              <input
+                type="text"
+                id="repairOrderNo"
+                maxlength="30"
+                autocomplete="off"
+                placeholder="เช่น 4030216047"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <!-- แถวที่ 2.5: Service Material / Serial Number / Service Technician -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >Service Material</label
+              >
+              <input
+                type="text"
+                id="serviceMaterial"
+                maxlength="200"
+                autocomplete="off"
+                oninput="handleCodeAutocomplete(this)"
+                placeholder="พิมพ์ 2 ตัวอักษรขึ้นไปเพื่อค้นรหัสสินค้า"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >Serial Number</label
+              >
+              <input
+                type="text"
+                id="serialNumber"
+                maxlength="100"
+                placeholder="ระบุ Serial Number"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+                >Service Technician</label
+              >
+              <select
+                id="serviceTechnician"
+                class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none bg-white"
+              >
+                <option value="">-- เลือกช่างผู้ให้บริการ --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- แถวที่ 3: รายการสินค้า -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-semibold text-slate-500"
+                >รายการสินค้า</label
+              >
+              <button
+                onclick="addItemRow()"
+                type="button"
+                class="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1"
+              >
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> เพิ่มรายการ
+              </button>
+            </div>
+            <div class="border border-slate-200 rounded-xl overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[1000px]" style="table-layout: fixed;">
+                  <colgroup>
+                    <col style="width: 3%;"><col style="width: 12%;"><col style="width: 20%;"><col style="width: 6%;"><col style="width: 8%;"><col style="width: 14%;"><col style="width: 12%;"><col style="width: 22%;"><col style="width: 3%;">
+                  </colgroup>
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-10"
+                      >
+                        #
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase text-center"
+                      >
+                        รหัสสินค้า (Prod.Code)
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase text-center"
+                      >
+                        รายละเอียดสินค้า (Description)
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-20 text-center"
+                      >
+                        Qty
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-24 text-center"
+                      >
+                        หน่วย
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-36 text-center"
+                      >
+                        วันที่ซื้อ
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-32 text-center"
+                      >
+                        เลขที่บิล
+                      </th>
+                      <th
+                        class="px-2 py-2 text-[11px] font-semibold text-slate-500 uppercase w-32 text-center"
+                      >
+                        Remark
+                      </th>
+                      <th class="px-2 py-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="itemRowsBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="info" class="w-3 h-3"></i>
+              ลูกค้ารายเดียวอาจถือสินค้ามาหลายชิ้นจากคนละบิลคนละวัน —
+              กรอกวันที่ซื้อและเลขที่บิลแยกได้ทีละรายการ
+            </p>
+          </div>
+
+          <!-- แถวที่ 4: ผู้พิจารณา + ไฟล์แนบ -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div
+              class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+            >
+              <div
+                class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+              >
+                <i data-lucide="user" class="w-3.5 h-3.5 text-brand-500"></i>
+                ผู้รับเรื่องจากลูกค้า
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1"
+                  >ชื่อ-นามสกุล</label
+                >
+                <input
+                  type="text"
+                  id="requesterName"
+                  class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1"
+                  >Email</label
+                >
+                <input
+                  type="email"
+                  id="requesterEmail"
+                  class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+              </div>
+            </div>
+            <div
+              class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+            >
+              <div
+                class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+              >
+                <i
+                  data-lucide="megaphone"
+                  class="w-3.5 h-3.5 text-brand-500"
+                ></i>
+                <span id="approverSectionTitle">เจ้าหน้าที่การตลาด (ผู้พิจารณา)</span>
+              </div>
+              <p id="approverSectionHint" class="hidden text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5"></p>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1"
+                  >ชื่อ-นามสกุล <span class="text-red-500">*</span></label
+                >
+                <select
+                  id="mktNotifyName"
+                  onchange="onMktSelectChange(true)"
+                  class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none bg-white"
+                >
+                  <option value="">-- กำลังโหลดรายชื่อ... --</option>
+                </select>
+                <input type="hidden" id="mktNotifyEmpId" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1"
+                  >Email (ส่งแจ้งให้เข้ามาพิจารณา)</label
+                >
+                <input
+                  type="email"
+                  id="mktNotifyEmail"
+                  oninput="onMktEmailEdited()"
+                  placeholder="marketing@ktw.co.th"
+                  class="w-full h-9 px-2.5 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- แถวที่ 5: ไฟล์แนบตอนรับเรื่อง -->
+          <div
+            class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+          >
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div
+                class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+              >
+                <i
+                  data-lucide="paperclip"
+                  class="w-3.5 h-3.5 text-brand-500"
+                ></i>
+                ไฟล์แนบประกอบการเคลม (ไม่บังคับ)
+              </div>
+              <span id="attachmentCountLabel" class="text-[11px] text-slate-400"
+                >0 / 5 ไฟล์</span
+              >
+            </div>
+            <input
+              type="file"
+              id="attachmentFile"
+              accept=".pdf,.jpg,.jpeg,.png"
+              multiple
+              onchange="handleAttachmentFileSelect(this)"
+              class="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100"
+            />
+            <p class="text-[11px] text-slate-400">
+              รองรับ PDF / JPG / PNG ไม่เกินไฟล์ละ 5 MB รวมไม่เกิน 5 ไฟล์
+              (เช่น รูปสินค้าเสีย สำเนาบิล)
+            </p>
+            <p
+              id="attachmentFileError"
+              class="text-[11px] text-red-500 hidden"
+            ></p>
+            <div id="attachmentList" class="space-y-1.5"></div>
+          </div>
+        </div>
+
+        <div
+          class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 shrink-0"
+        >
+          <button
+            onclick="closeDocModal()"
+            class="h-10 px-4 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onclick="submitDocForm()"
+            id="submitDocBtn"
+            class="h-10 px-5 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-600 shadow-md shadow-brand-500/10 flex items-center gap-2"
+          >
+            <i data-lucide="save" class="w-4 h-4"></i>
+            บันทึกเอกสาร
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: ปิดงาน ===================== -->
+    <div
+      id="closeDocModal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/50 backdrop-blur-xs"
+    >
+      <div
+        class="modal-transition bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col"
+      >
+        <div
+          class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0"
+        >
+          <div class="flex items-center gap-2">
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-xs"
+            >
+              <i data-lucide="package-check" class="w-4 h-4"></i>
+            </div>
+            <h2 class="text-lg font-bold text-slate-900">ปิดงานเอกสารเคลม</h2>
+          </div>
+          <button
+            onclick="closeCloseDocModal()"
+            class="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="overflow-y-auto px-6 py-5 space-y-5">
+          <input type="hidden" id="closingDocId" value="" />
+
+          <div
+            id="closeDocSummary"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-1.5 text-xs"
+          ></div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-500 mb-1.5"
+              >ความเห็นปิดงาน (ไม่บังคับ)</label
+            >
+            <textarea
+              id="closeComment"
+              rows="3"
+              maxlength="500"
+              placeholder="เช่น ส่งของคืนลูกค้าแล้ว / ลูกค้ารับเครื่องคืนวันที่ ..."
+              class="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none resize-none"
+            ></textarea>
+            <p class="text-[10px] text-slate-400 mt-1">ไม่เกิน 500 ตัวอักษร</p>
+          </div>
+
+          <div
+            class="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50/50"
+          >
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div
+                class="flex items-center gap-2 text-xs font-semibold text-slate-700"
+              >
+                <i
+                  data-lucide="paperclip"
+                  class="w-3.5 h-3.5 text-brand-500"
+                ></i>
+                ไฟล์แนบตอนปิดงาน (ไม่บังคับ)
+              </div>
+              <span
+                id="closeAttachmentCountLabel"
+                class="text-[11px] text-slate-400"
+                >0 / 5 ไฟล์</span
+              >
+            </div>
+            <input
+              type="file"
+              id="closeAttachmentFile"
+              accept=".pdf,.jpg,.jpeg,.png"
+              multiple
+              onchange="handleCloseAttachmentFileSelect(this)"
+              class="w-full text-xs file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100"
+            />
+            <p class="text-[11px] text-slate-400">
+              เช่น ใบรับของคืนที่ลูกค้าเซ็น รูปสินค้าที่ซ่อมเสร็จ
+            </p>
+            <p
+              id="closeAttachmentFileError"
+              class="text-[11px] text-red-500 hidden"
+            ></p>
+            <div id="closeAttachmentList" class="space-y-1.5"></div>
+          </div>
+
+          <p
+            class="text-[11px] text-amber-600 flex items-start gap-1.5 bg-amber-50 border border-amber-100 rounded-lg p-2.5"
+          >
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 mt-px shrink-0"></i>
+            <span
+              >ปิดงานแล้วจะแก้ไขเอกสารไม่ได้อีก และผลการพิจารณาของการตลาด
+              (อนุมัติ / ไม่อนุมัติ) จะถูกเก็บไว้ตามเดิม</span
+            >
+          </p>
+        </div>
+
+        <div
+          class="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 shrink-0"
+        >
+          <button
+            onclick="closeCloseDocModal()"
+            class="h-10 px-4 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onclick="submitCloseDoc()"
+            id="submitCloseBtn"
+            class="h-10 px-5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-500/10 flex items-center gap-2"
+          >
+            <i data-lucide="check" class="w-4 h-4"></i>
+            ยืนยันปิดงาน
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== MODAL: ดูรายละเอียด ===================== -->
+    <div
+      id="viewModal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
+    >
+      <div
+        class="modal-transition bg-white rounded-2xl shadow-2xl w-[95vw] max-w-[1600px] max-h-[95vh] flex flex-col"
+      >
+        <div
+          class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0"
+        >
+          <h2 class="text-lg font-bold text-slate-900" id="viewModalTitle">
+            รายละเอียดเอกสาร
+          </h2>
+          <div class="flex items-center gap-2">
+            <button
+              onclick="printDocument()"
+              class="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+            >
+              <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+              พิมพ์ / บันทึก PDF
+            </button>
+            <button
+              onclick="closeViewModal()"
+              class="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+            >
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+        <div
+          id="viewModalBody"
+          class="overflow-y-auto px-6 py-5 space-y-4 text-base"
+        ></div>
+      </div>
+    </div>
+
+    <div id="printArea" class="hidden"></div>
+    <style>
+      @media print {
+        body > *:not(#printArea) {
+          display: none !important;
+        }
+        #printArea {
+          display: block !important;
+          position: static !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          padding: 24px !important;
+          margin: 0 !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+        @page {
+          margin: 10mm;
+          size: portrait;
+        }
+        /* ⚠️ กล่องความเห็นผู้พิจารณาใน Preview ไม่ต้องโชว์ตอนพิมพ์เอกสารจริง */
+        .no-print {
+          display: none !important;
+        }
+      }
+    </style>
+
+    <!-- แท่น Toast Notification -->
+    <div
+      id="toast-container"
+      class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none"
+    ></div>
+
+    <!-- แกนกลางระบบ KTW HUB -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- โมดูล Service ของ claim.html (Logic แยกจาก HTML) -->
+    <script src="../modules/claimService.js"></script>
+  </body>
+</html>

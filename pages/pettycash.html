@@ -1,0 +1,212 @@
+﻿<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>บันทึกเงินสดย่อย - KTW Inventory System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+      if (!sessionStorage.getItem("emp_id")) { window.location.href = "../index.html"; }
+      tailwind.config = { theme: { extend: { fontFamily: { sans: ["Prompt", "sans-serif"] }, colors: { brand: { 50: "#fff7ed", 100: "#ffedd5", 500: "#f97316", 600: "#ea580c", 700: "#c2410c" } } } } };
+    </script>
+    <style>
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      .modal-transition { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease-out; }
+      .num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+      .ledger td, .ledger th { padding: 6px 10px; }
+      .ledger tr.day-total td { border-top: 2px solid #f87171; background: #fef2f2; font-weight: 600; }
+      .ledger tr.grand-total td { border-top: 2px solid #dc2626; border-bottom: 3px double #dc2626; background: #fee2e2; font-weight: 700; }
+      .ledger tr.draft td { background: #fffbeb; }
+      body.ktwda-dark .ledger tr.day-total td { background: rgba(239,68,68,0.10) !important; }
+      body.ktwda-dark .ledger tr.grand-total td { background: rgba(239,68,68,0.18) !important; }
+      body.ktwda-dark .ledger tr.draft td { background: rgba(245,158,11,0.12) !important; }
+      .print-only { display: none; }
+      @media print {
+        @page { size: A4 landscape; margin: 10mm; }
+        body { background: #fff !important; display: block !important; }
+        #sidebar-container, header, #mobile-sidebar, .no-print, #toast-container { display: none !important; }
+        main { padding: 0 !important; }
+        .print-only { display: block !important; }
+        .shadow-sm { box-shadow: none !important; }
+        .ledger { font-size: 11px; min-width: 0 !important; }
+        .ledger .col-act { display: none; }
+        .overflow-x-auto { overflow: visible !important; }
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col md:flex-row antialiased">
+    <aside id="sidebar-container" class="hidden md:block h-screen sticky top-0 shrink-0"></aside>
+
+    <header class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50">
+      <div class="flex items-center gap-2">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden"><span class="text-white font-black text-[9px] tracking-tighter">KTW</span></div>
+        <h2 class="text-sm font-semibold text-slate-950">KTW Inventory System</h2>
+      </div>
+      <button onclick="toggleMobileMenu()" class="p-1 rounded-lg text-slate-600 hover:bg-slate-50"><i id="mobileMenuBtn" data-lucide="menu" class="w-6 h-6"></i></button>
+    </header>
+    <div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+      <div onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+      <div class="fixed top-0 bottom-0 left-0 w-64 bg-white shadow-2xl flex flex-col"><div id="mobile-sidebar-content" class="h-full"></div></div>
+    </div>
+
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+      <!-- ===================== หน้ารายการงวด ===================== -->
+      <section id="listView" class="space-y-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">บันทึกเงินสดย่อย</h1>
+            <p class="text-sm text-slate-500">บันทึกเงินที่เบิก รายจ่ายรายวันแยกตามประเภท สรุปยอดจ่ายและคงเหลือของแต่ละงวด</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+          <button id="btnNewRequest" onclick="openRequestFromList()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium bg-white border border-orange-300 text-orange-700 hover:bg-orange-50 h-11 px-5 transition-all active:scale-95">
+            <i data-lucide="file-plus-2" class="w-4 h-4"></i> สร้างเอกสารขอเบิกเงินสดย่อย
+          </button>
+          <button id="btnNewPeriod" onclick="onNewPeriodClick()" class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium bg-brand-500 text-white hover:bg-brand-600 h-11 px-5 shadow-md shadow-brand-500/10 transition-all active:scale-95">
+            <i data-lucide="wallet" class="w-4 h-4"></i> เปิดงวดใหม่
+          </button>
+          </div>
+        </div>
+
+        <div id="listStats" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+
+        <div class="space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+            <h3 id="listTitle" class="text-sm font-semibold text-slate-600">งวดเงินสดย่อยของฉัน</h3>
+            <div class="flex items-center gap-3 flex-wrap">
+              <select id="scopeSel" onchange="loadPeriods()" class="hidden h-9 px-3 rounded-lg border border-slate-200 text-xs bg-white outline-none focus:ring-1 focus:ring-brand-500">
+                <option value="own">เฉพาะของฉัน</option><option value="all">ทุกคน</option>
+              </select>
+              <button onclick="loadPeriods()" class="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-orange-600 transition-colors"><i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="syncIcon"></i> โหลดใหม่</button>
+            </div>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse min-w-[900px]">
+                <thead><tr class="bg-slate-50/75 border-b border-slate-200 text-xs font-semibold text-slate-500">
+                  <th class="p-4 w-40">เลขที่งวด</th><th class="p-4">ช่วงวันที่</th><th class="p-4">ผู้ถือเงิน</th>
+                  <th class="p-4 num">ยอดยกมา</th><th class="p-4 num">เบิก</th><th class="p-4 num">จ่าย</th><th class="p-4 num">คงเหลือ</th>
+                  <th class="p-4 w-28">สถานะ</th></tr></thead>
+                <tbody id="periodBody" class="divide-y divide-slate-100 text-sm">
+                  <tr><td colspan="8" class="px-4 py-8 text-center text-sm text-slate-400">กำลังโหลดข้อมูล...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== หน้ารายละเอียดงวด (สมุดเงินสดย่อย) ===================== -->
+      <section id="periodView" class="hidden space-y-5">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-200 pb-4">
+          <div class="flex items-start gap-3">
+            <button onclick="backToList()" class="no-print mt-1 p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900" title="กลับไปรายการงวด"><i data-lucide="arrow-left" class="w-4 h-4"></i></button>
+            <div>
+              <h1 class="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2 flex-wrap"><span>สมุดเงินสดย่อย</span> <span id="pvNo" class="font-mono text-lg text-slate-500"></span> <span id="pvStatus"></span></h1>
+              <p id="pvSub" class="text-sm text-slate-500"></p>
+            </div>
+          </div>
+          <div id="pvActions" class="no-print flex flex-wrap items-center gap-2"></div>
+        </div>
+
+        <!-- สรุปยอด: เบิก / จ่าย / เหลือ -->
+        <div id="pvSummary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+        <div id="pvCatSummary" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm"></div>
+
+        <!-- เบิกเงิน -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="banknote" class="w-4 h-4 text-emerald-500"></i> การเบิกเงินเข้างวด</h3>
+            <span id="advTotal" class="text-sm font-semibold text-emerald-600 num"></span>
+          </div>
+          <div id="advForm" class="no-print hidden px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+              <div><label class="block text-[11px] font-semibold text-slate-500 mb-1">วันที่เบิก</label><input id="aDate" type="date" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div><label class="block text-[11px] font-semibold text-slate-500 mb-1">จำนวนเงิน (บาท)</label><input id="aAmt" type="number" min="0" step="0.01" inputmode="decimal" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div><label class="block text-[11px] font-semibold text-slate-500 mb-1">เลขที่ใบเบิก / เช็ค</label><input id="aRef" maxlength="50" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div class="md:col-span-2"><label class="block text-[11px] font-semibold text-slate-500 mb-1">หมายเหตุ</label><input id="aNote" maxlength="300" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <button id="aBtn" onclick="addAdvance()" class="h-9 px-4 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 inline-flex items-center justify-center gap-1.5"><i data-lucide="plus" class="w-4 h-4"></i> บันทึกการเบิก</button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm min-w-[640px]">
+              <thead><tr class="text-xs font-semibold text-slate-500 border-b border-slate-100"><th class="px-4 py-2 w-28">วันที่</th><th class="px-4 py-2 num w-36">จำนวนเงิน</th><th class="px-4 py-2 w-40">เลขที่อ้างอิง</th><th class="px-4 py-2">หมายเหตุ</th><th class="px-4 py-2 w-40">ผู้บันทึก</th><th class="px-4 py-2 w-20 col-act no-print"></th></tr></thead>
+              <tbody id="advBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- รายจ่าย (สมุด) -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm">
+          <div class="flex items-center justify-between flex-wrap gap-2 px-4 py-3 border-b border-slate-100">
+            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2"><i data-lucide="notebook-pen" class="w-4 h-4 text-orange-500"></i> รายการจ่าย</h3>
+            <div class="no-print flex items-center gap-2">
+              <input id="ledgerQ" oninput="renderLedger()" placeholder="ค้นหารายการ / เลขที่ / ผู้รับเงิน" class="h-8 w-56 px-3 rounded-lg border border-slate-200 text-xs outline-none focus:ring-1 focus:ring-brand-500" />
+            </div>
+          </div>
+
+          <!-- แถวกรอกข้อมูล (เหมือนเขียนสมุดทีละบรรทัด) -->
+          <div id="entryBar" class="no-print hidden px-4 py-3 border-b border-slate-100 bg-orange-50/40">
+            <div class="grid grid-cols-2 md:grid-cols-12 gap-2 items-end">
+              <div class="md:col-span-2"><label class="block text-[11px] font-semibold text-slate-500 mb-1">วันที่ <span class="text-red-500">*</span></label><input id="eDate" type="date" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div class="col-span-2 md:col-span-3"><label class="block text-[11px] font-semibold text-slate-500 mb-1">รายการ <span class="text-red-500">*</span></label><input id="eDesc" list="dlDesc" maxlength="300" placeholder="เช่น ค่าน้ำมัน เพชรสาคร / ของขึ้น วิศวกรรมไทย" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div class="md:col-span-2"><label class="block text-[11px] font-semibold text-slate-500 mb-1">เลขที่ / ทะเบียน</label><input id="eRef" maxlength="50" placeholder="เช่น 2045, 13411" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div class="md:col-span-2"><label class="block text-[11px] font-semibold text-slate-500 mb-1">ประเภท <span class="text-red-500">*</span></label><select id="eCat" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500"></select></div>
+              <div class="md:col-span-1"><label class="block text-[11px] font-semibold text-slate-500 mb-1">จำนวนเงิน <span class="text-red-500">*</span></label><input id="eAmt" type="number" min="0" step="0.01" inputmode="decimal" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm text-right bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <div class="md:col-span-1"><label class="block text-[11px] font-semibold text-slate-500 mb-1">ผู้รับเงิน</label><input id="ePayee" list="dlPayee" maxlength="100" class="w-full h-9 px-2 rounded-lg border border-slate-200 text-sm bg-white outline-none focus:ring-1 focus:ring-brand-500" /></div>
+              <button onclick="addDraft()" class="md:col-span-1 h-9 px-3 rounded-lg text-sm font-medium bg-white border border-orange-300 text-orange-700 hover:bg-orange-50 inline-flex items-center justify-center gap-1" title="เพิ่มลงรายการ (กด Enter ได้)"><i data-lucide="plus" class="w-4 h-4"></i> เพิ่ม</button>
+            </div>
+            <div class="flex items-center justify-between flex-wrap gap-2 mt-2">
+              <p class="text-[11px] text-slate-500">กรอกแล้วกด <b>Enter</b> เพื่อเพิ่มบรรทัด (วันที่/ประเภท/ผู้รับเงินจะคงไว้ให้บรรทัดถัดไป) แล้วกด <b>บันทึก</b> ทีเดียว</p>
+              <div id="draftBar" class="hidden flex items-center gap-2">
+                <span id="draftInfo" class="text-xs font-semibold text-amber-700"></span>
+                <button onclick="clearDraft()" class="h-8 px-3 rounded-lg text-xs font-medium text-slate-600 border border-slate-200 bg-white hover:bg-slate-50">ล้างที่ยังไม่บันทึก</button>
+                <button id="btnSaveDraft" onclick="saveDraft()" class="h-8 px-4 rounded-lg text-xs font-semibold bg-brand-500 text-white hover:bg-brand-600 inline-flex items-center gap-1.5"><i data-lucide="save" class="w-3.5 h-3.5"></i> บันทึก</button>
+              </div>
+            </div>
+            <datalist id="dlDesc"></datalist><datalist id="dlPayee"></datalist>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table id="ledger" class="ledger w-full text-left text-sm border-collapse min-w-[1100px]"></table>
+          </div>
+        </div>
+        <p class="print-only text-xs text-slate-500" id="printFoot"></p>
+      </section>
+    </main>
+
+    <!-- ===================== MODAL ทั่วไป ===================== -->
+    <div id="modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/50 backdrop-blur-xs">
+      <div class="modal-transition bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+          <h2 id="mTitle" class="text-lg font-bold text-slate-900"></h2>
+          <button onclick="closeModal()" class="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div id="mBody" class="overflow-y-auto px-6 py-5 space-y-4"></div>
+        <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-200 shrink-0">
+          <button onclick="closeModal()" class="h-10 px-5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 border border-slate-200">ยกเลิก</button>
+          <button id="mOk" class="h-10 px-5 rounded-lg text-sm font-medium bg-brand-500 text-white hover:bg-brand-600 shadow-md shadow-brand-500/10">ยืนยัน</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- แกนกลางระบบ KTW HUB -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- โมดูล Service ของ pettycash.html (Logic แยกจาก HTML) -->
+    <script src="../modules/pettycashService.js"></script>
+  </body>
+</html>

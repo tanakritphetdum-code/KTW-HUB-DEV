@@ -1,0 +1,351 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ประวัติการทำงาน - KTW Inventory System</title>
+    <!-- นำเข้าฟอนต์ Prompt -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- นำเข้า Tailwind CSS และ Lucide Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Prompt', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316', // สีส้มหลัก KTW
+                            600: '#ea580c', // สีส้มเข้มตอน Hover
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* สไตล์คัสตอมเพิ่มเติมสำหรับความลื่นไหล */
+        .modal-transition {
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease-out;
+        }
+        /* แถบเลื่อนสไตล์มินิมอล */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* แถวที่ค่าเปลี่ยนแปลงในตาราง Diff */
+        .diff-changed { background: #fff7ed; }
+    </style>
+    <script>
+        // ระบบป้องกันความปลอดภัยในสิทธิ์แอดมิน — หน้ากลาง อนุญาตถ้าเป็น Admin ของระบบใดระบบหนึ่งอย่างน้อย 1 ระบบ
+        const currentEmpId = sessionStorage.getItem('emp_id');
+        const empType = sessionStorage.getItem('emp_type') || '0';
+        const disassemblyRole = sessionStorage.getItem('disassembly_role') || '0';
+        const ncrRole = sessionStorage.getItem('ncr_role') || '0';
+        let isAdminAnySystem = empType === '1' || disassemblyRole === '1' || ncrRole === '1';
+        // ถ้ามีสิทธิ์จากระบบ Permission ใหม่ (แคชจาก perm.js) ให้ใช้ PORTAL.MENU_HISTORY แทนกติกา Role เดิม
+        try {
+            const pc = JSON.parse(sessionStorage.getItem('ktw_perm_v1') || 'null');
+            if (pc && pc.emp === currentEmpId && pc.map && pc.map.__loaded) isAdminAnySystem = !!pc.map['PORTAL.MENU_HISTORY'];
+        } catch (e) {}
+
+        if (!currentEmpId) {
+            window.location.href = '../index.html';
+        } else if (!isAdminAnySystem) {
+            if (window.location.protocol === 'blob:') {
+                console.warn("ตรวจพบบริบท Sandbox พรีวิว - ทำการเปิดสิทธิ์การใช้งานแอดมินจำลองให้");
+                sessionStorage.setItem('disassembly_role', '1');
+            } else {
+                window.location.href = 'main.html';
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col md:flex-row antialiased">
+
+    <!-- แผงเมนูด้านซ้าย Sidebar (สำหรับหน้าจอคอมพิวเตอร์ Desktop PC) -->
+    <aside id="sidebar-container" class="hidden md:block h-screen sticky top-0 shrink-0"></aside>
+
+    <!-- เมนูแถบหัวด้านบนสำหรับโทรศัพท์มือถือ (Responsive Header Area) -->
+    <header class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <!-- ใช้ตราอักษร KTW แบบเดียวกับ main.html / index.html แทนไฟล์ logo.png
+                 ซึ่งไม่มีอยู่บนเซิร์ฟเวอร์ ทำให้ Console ขึ้น 404 ทุกครั้งที่เปิดหน้านี้ -->
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden">
+                <span class="text-white font-black text-[9px] tracking-tighter">KTW</span>
+            </div>
+            <h2 class="text-sm font-semibold text-slate-950">KTW Inventory System</h2>
+        </div>
+        <button onclick="toggleMobileMenu()" class="p-1 rounded-lg text-slate-600 hover:bg-slate-50">
+            <i id="mobileMenuBtn" data-lucide="menu" class="w-6 h-6"></i>
+        </button>
+    </header>
+
+    <!-- ลิ้นชักเมนูข้าง (Mobile Drawer) -->
+    <div id="mobile-sidebar" class="hidden fixed inset-0 z-40 md:hidden">
+        <div onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs"></div>
+        <div class="fixed top-0 bottom-0 left-0 w-64 bg-white shadow-2xl flex flex-col">
+            <div id="mobile-sidebar-content" class="h-full"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+    <!-- ส่วนเนื้อหาแผงประวัติการทำงาน (Main Interface Panel) -->
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 overflow-x-hidden">
+
+        <!-- ส่วนหัวข้อ -->
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-slate-200 pb-5">
+            <div>
+                <div class="flex items-center gap-2 text-brand-600 font-semibold text-xs uppercase tracking-wider mb-1">
+                    <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    กลุ่มควบคุมความปลอดภัยองค์กร
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">ประวัติการทำงาน (History Log)</h1>
+                <p class="text-sm text-slate-500">ตรวจสอบรายละเอียดการสร้าง แก้ไข ลบ กู้คืนข้อมูล และการเปลี่ยนสิทธิ์ รวมทุกระบบ ในที่เดียว</p>
+            </div>
+
+            <div class="flex items-center gap-2 self-stretch sm:self-auto">
+                <button
+                    onclick="initAuditLogData()"
+                    class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-xs font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 transition-all shadow-xs"
+                >
+                    <i id="syncIcon" data-lucide="refresh-cw" class="w-4 h-4 text-brand-500"></i>
+                    <span>ซิงค์ข้อมูลล่าสุด</span>
+                </button>
+                <button
+                    id="openClearLogsBtn"
+                    onclick="openClearLogsModal()"
+                    class="inline-flex items-center justify-center gap-2 h-10 px-3.5 rounded-xl text-xs font-semibold bg-white border border-red-200 hover:bg-red-50 text-red-500 transition-all shadow-xs"
+                >
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">ล้าง Log เก่า</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- การ์ดสรุปภาพรวม -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">รายการทั้งหมด</p>
+                <p class="text-xl font-bold text-slate-900 mt-1" id="statTotal">–</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">เอกสาร (ทุกระบบ)</p>
+                <p class="text-xl font-bold text-brand-600 mt-1" id="statSwapDoc">–</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">จัดการพนักงาน (ทุกระบบ)</p>
+                <p class="text-xl font-bold text-indigo-600 mt-1" id="statEmployee">–</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
+                <p class="text-[11px] font-medium text-slate-400 uppercase tracking-wider">รายการลบวันนี้</p>
+                <p class="text-xl font-bold text-red-600 mt-1" id="statDeleteToday">–</p>
+            </div>
+        </div>
+
+        <!-- แถบตัวกรอง -->
+        <div class="bg-white border border-slate-150 rounded-2xl p-4 space-y-3">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                <!-- ช่องค้นหาผู้ทำรายการ -->
+                <div class="relative flex-1">
+                    <i data-lucide="search" class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                    <input
+                        type="text"
+                        id="searchActor"
+                        oninput="onLogSearchInput(this.value)"
+                        placeholder="ค้นหาชื่อผู้ทำรายการ, รหัสเอกสาร, รายละเอียด..."
+                        class="w-full h-10 pl-10 pr-9 rounded-xl border border-slate-200 bg-white text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 outline-none"
+                    >
+                    <button
+                        id="clearLogSearchBtn"
+                        onclick="clearLogSearchInput()"
+                        class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                        <i data-lucide="x-circle" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- ช่วงวันที่ -->
+                <div class="flex items-center gap-1.5">
+                    <input type="date" id="filterDateFrom" onchange="onLogFilterChange()" class="h-10 rounded-xl border border-slate-200 bg-white px-2.5 text-xs text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
+                    <span class="text-slate-400 text-xs">ถึง</span>
+                    <input type="date" id="filterDateTo" onchange="onLogFilterChange()" class="h-10 rounded-xl border border-slate-200 bg-white px-2.5 text-xs text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none">
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-1 border-t border-slate-100">
+                <div class="flex items-center gap-1.5">
+                    <label for="filterModule" class="text-[11px] font-semibold text-slate-500">ส่วนงาน:</label>
+                    <select id="filterModule" onchange="onLogFilterChange()" class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer">
+                        <option value="all">ทุกส่วนงาน</option>
+                        <option value="SwapDocument">เอกสารสลับสินค้า (SWAP)</option>
+                        <option value="Employee">จัดการพนักงาน (SWAP)</option>
+                        <option value="DisassemblyDocument">เอกสารแกะอะไหล่ (Disassembly)</option>
+                        <option value="DisassemblyEmployee">จัดการพนักงาน (Disassembly)</option>
+                        <option value="NcrDocument">เอกสาร NCR</option>
+                        <option value="NcrEmployee">จัดการพนักงาน (NCR)</option>
+                        <option value="ClaimDocument">เอกสารเคลมสินค้าลูกค้า (Claim)</option>
+                        <option value="ClaimEmployee">จัดการพนักงาน (Claim)</option>
+                        <option value="BorrowDocument">ขออนุมัติยืมสินค้าหน้าร้าน (Borrow)</option>
+                        <option value="BorrowEmployee">จัดการพนักงาน (Borrow)</option>
+                        <option value="PermissionLog">สิทธิ์รายข้อ (Permission)</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <label for="filterActionType" class="text-[11px] font-semibold text-slate-500">ประเภท:</label>
+                    <select id="filterActionType" onchange="onLogFilterChange()" class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer">
+                        <option value="all">ทุกประเภท</option>
+                        <option value="CREATE">สร้างใหม่</option>
+                        <option value="UPDATE">แก้ไข (SWAP)</option>
+                        <option value="EDIT">แก้ไข (Disassembly)</option>
+                        <option value="MARKETING_APPROVE">การตลาดเซ็น</option>
+                        <option value="FINAL_APPROVE">ผู้อนุมัติเซ็น</option>
+                        <option value="APPROVE_MID">อนุมัติขั้นกลาง (NCR)</option>
+                        <option value="APPROVE_SCM">อนุมัติขั้นสุดท้าย (NCR)</option>
+                        <option value="REJECT">ปฏิเสธเอกสาร</option>
+                        <option value="REQUEST_DOCS">ขอเอกสารเพิ่มเติม (Claim)</option>
+                        <option value="DELETE">ลบ</option>
+                        <option value="RESTORE">กู้คืน</option>
+                        <option value="UPDATE_ROLE">เปลี่ยนสิทธิ์</option>
+                        <option value="PERM_OVERRIDE">สิทธิ์เฉพาะคน (Permission)</option>
+                        <option value="PERM_LEVEL">เปลี่ยนระดับ (Permission)</option>
+                        <option value="PERM_DEPT">เปลี่ยนแผนกของสิทธิ์ (Permission)</option>
+                    </select>
+                </div>
+
+                <button
+                    onclick="resetLogFilters()"
+                    class="ml-auto inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-400 hover:text-red-500 transition-colors"
+                >
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    ล้างตัวกรองทั้งหมด
+                </button>
+            </div>
+        </div>
+
+        <!-- ตารางประวัติการทำงาน -->
+        <div class="border border-slate-150 rounded-xl overflow-hidden bg-white relative">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[860px]">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                            <th class="p-4 w-44 cursor-pointer select-none hover:text-brand-600 transition-colors" onclick="setLogSortColumn('log_time')">
+                                <span class="inline-flex items-center gap-1">วันเวลา <i id="sort-icon-log_time" data-lucide="chevrons-up-down" class="w-3 h-3 text-slate-300"></i></span>
+                            </th>
+                            <th class="p-4 w-44">ผู้ทำรายการ</th>
+                            <th class="p-4 w-36">ส่วนงาน</th>
+                            <th class="p-4 w-32">ประเภท</th>
+                            <th class="p-4">รายละเอียด</th>
+                            <th class="p-4 w-52 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditLogTableBody" class="divide-y divide-slate-100 text-xs">
+                        <!-- แถวรายการจะถูกเรนเดอร์ผ่าน JavaScript (มี Skeleton แสดงเริ่มต้น) -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- แถบควบคุม Pagination -->
+        <div id="paginationBar" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
+            <div class="flex items-center gap-3 text-[11px] text-slate-500">
+                <span id="paginationInfoText">แสดง 0 รายการ</span>
+                <div class="flex items-center gap-1.5">
+                    <label for="pageSizeSelect" class="text-slate-400">แสดงต่อหน้า:</label>
+                    <select
+                        id="pageSizeSelect"
+                        onchange="onLogPageSizeChange(this.value)"
+                        class="h-7 rounded-lg border border-slate-200 bg-white px-2 text-[11px] text-slate-700 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none cursor-pointer"
+                    >
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="paginationControls" class="flex items-center gap-1">
+                <!-- ปุ่มเลขหน้าจะถูกเรนเดอร์ผ่าน JavaScript -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL: ล้าง Log เก่า -->
+    <!-- ========================================== -->
+    <div id="clearLogsModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div onclick="closeClearLogsModal()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex items-center gap-2 text-red-600">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                <h3 class="text-lg font-bold">ล้าง Log เก่า</h3>
+            </div>
+            <p class="text-sm text-slate-500">การลบ log เก่าเป็นการลบถาวร <strong class="text-red-600">ไม่สามารถกู้คืนได้</strong> ใช้ได้กับ log ของทุกระบบที่โหลดมาแล้วในหน้านี้ กรุณาเลือกวันที่ให้แน่ใจก่อนดำเนินการ</p>
+
+            <div class="space-y-1">
+                <label class="text-xs font-medium text-slate-600">ลบ log ทั้งหมดที่เกิดขึ้น "ก่อนวันที่"</label>
+                <input type="date" id="clearBeforeDate" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-red-400 outline-none">
+            </div>
+
+            <div id="clearLogsPreview" class="hidden text-sm bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 py-2"></div>
+
+            <div class="flex gap-2 justify-end pt-2">
+                <button onclick="closeClearLogsModal()" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">ยกเลิก</button>
+                <button id="previewClearBtn" onclick="previewClearLogs()" class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-800 text-white hover:bg-slate-900">ตรวจสอบจำนวน</button>
+                <button id="confirmClearBtn" onclick="confirmClearLogs()" class="hidden px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700">ยืนยันลบถาวร</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- POPUP MODAL: รายละเอียด Log (Before/After Diff) -->
+    <!-- ========================================== -->
+    <div id="logDetailModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div id="logDetailModalContent" class="modal-transition transform scale-95 opacity-0 bg-white w-full max-w-3xl max-h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">รายละเอียดรายการ</h3>
+                    <p id="logDetailSubtitle" class="text-xs text-slate-500 mt-0.5">–</p>
+                </div>
+                <button onclick="closeLogDetailModal()" class="h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div id="logDetailBody" class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                <!-- เนื้อหารายละเอียดจะถูกเรนเดอร์ผ่าน JavaScript -->
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 shrink-0 flex justify-end">
+                <button onclick="closeLogDetailModal()" class="h-9 px-5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors">ปิดหน้าต่างนี้</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- แกนกลางระบบ KTW HUB -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- โมดูล Service ของ history_log.html (Logic แยกจาก HTML) -->
+    <script src="../modules/historyLogService.js"></script>
+</body>
+</html>
