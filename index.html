@@ -219,15 +219,30 @@
                     sessionStorage.setItem('dep', data.emp_dep || 'KTW');
                     sessionStorage.setItem('emp_type', String(data.emp_type ?? '0'));
 
+                    // หากเป็น Admin กำหนดสิทธิ์พื้นฐานของทุกระบบย่อยเป็น 1 ทันที
+                    if (String(data.emp_type) === '1') {
+                        sessionStorage.setItem('disassembly_role', '1');
+                        sessionStorage.setItem('ncr_role', '1');
+                        sessionStorage.setItem('claim_role', '1');
+                        sessionStorage.setItem('borrow_role', '1');
+                    }
+
                     showAlert('เข้าสู่ระบบสำเร็จ กำลังนำทาง...', false);
 
-                    // ดึงสิทธิ์ระบบอื่นๆ แบบขนาน (ไม่รอค้าง)
-                    loadAllModuleRoles(data.emp_id || empId);
+                    // ดึงสิทธิ์ระบบอื่นๆ แบบขนาน (รอไม่เกิน 1.5 วินาที)
+                    try {
+                        await Promise.race([
+                            loadAllModuleRoles(data.emp_id || empId),
+                            new Promise(r => setTimeout(r, 1500))
+                        ]);
+                    } catch (e) {
+                        console.warn('โหลดสิทธิ์เสริมข้ามไปก่อน:', e);
+                    }
                     if (window.KTWPerm) window.KTWPerm.load();
 
                     setTimeout(() => {
                         window.location.href = 'main.html';
-                    }, 400);
+                    }, 300);
                 } else {
                     showAlert(data.message || 'รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง');
                     btn.disabled = false;

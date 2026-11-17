@@ -7,6 +7,54 @@
         const empName = sessionStorage.getItem('name') || '';
         const empEmail = sessionStorage.getItem('email') || '';
 
+        // ดึงบทบาทจริงของระบบย่อย โดยรองรับกรณี Global Admin (emp_type === '1') ให้มีสิทธิ์เต็มเสมอ
+        function getEffectiveRole(sessionRoleKey) {
+            const isGlobalAdmin = (sessionStorage.getItem('emp_type') === '1');
+            const val = sessionStorage.getItem(sessionRoleKey);
+            if (val && val !== '0') return String(val);
+            if (isGlobalAdmin) return '1';
+            return val || '0';
+        }
+
+        // ตรวจสอบและดึงบทบาทสิทธิ์ของทุกระบบย่อยก่อนเรนเดอร์คิวอนุมัติ
+        async function ensureRolesLoaded() {
+            const currentEmp = sessionStorage.getItem('emp_id');
+            const isGlobalAdmin = (sessionStorage.getItem('emp_type') === '1');
+
+            if (isGlobalAdmin) {
+                if (!sessionStorage.getItem('disassembly_role') || sessionStorage.getItem('disassembly_role') === '0') sessionStorage.setItem('disassembly_role', '1');
+                if (!sessionStorage.getItem('ncr_role') || sessionStorage.getItem('ncr_role') === '0') sessionStorage.setItem('ncr_role', '1');
+                if (!sessionStorage.getItem('claim_role') || sessionStorage.getItem('claim_role') === '0') sessionStorage.setItem('claim_role', '1');
+                if (!sessionStorage.getItem('borrow_role') || sessionStorage.getItem('borrow_role') === '0') sessionStorage.setItem('borrow_role', '1');
+            }
+
+            if (!currentEmp) return;
+
+            const ROLE_FETCHERS = [
+                { key: 'disassembly_role', endpoint: 'get_disassembly_role' },
+                { key: 'ncr_role', endpoint: 'get_ncr_role' },
+                { key: 'claim_role', endpoint: 'get_role_claim_cus' }
+            ];
+
+            await Promise.all(ROLE_FETCHERS.map(async item => {
+                try {
+                    const res = await window.n8nFetch(`${item.endpoint}?empId=${encodeURIComponent(currentEmp)}`);
+                    if (res.ok) {
+                        const txt = await res.text();
+                        if (txt && txt.trim()) {
+                            const j = JSON.parse(txt);
+                            const row = Array.isArray(j) ? (j[0] || {}) : j;
+                            if (row.RoleId != null || row.role != null) {
+                                sessionStorage.setItem(item.key, String(row.RoleId ?? row.role));
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`โหลดสิทธิ์ ${item.key} ไม่สำเร็จ:`, e);
+                }
+            }));
+        }
+
         // สีของแต่ละ stage (ใช้ทั้งจุด/แถบซ้าย/badge) — กำหนดตายตัวไว้ให้ Tailwind CDN สแกน class เจอครบ
         const ACCENT_MAP = {
             amber:   { dot: 'bg-amber-500',   border: 'border-amber-500',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700',   badgeBorder: 'border-amber-200' },
@@ -981,7 +1029,7 @@
                         // (ตรงกับ SQL - Check Approve Claim Permission: @roleId = @appRole; ApproverRoleId ว่าง = 3)
                         matchDoc: d => {
                             if (d.Status !== 'PENDING_MKT') return false;
-                            const r = sessionStorage.getItem('claim_role') || '0';
+                            const r = getEffectiveRole('claim_role');
                             return r === '1' || String(d.ApproverRoleId ?? 3) === r;
                         },
                         recipientKeys: ['MktNotifyEmpId'],
@@ -1453,7 +1501,7 @@
         // แท็บกรองระบบ (รวมทุกระบบ / ต่อระบบ) — สร้างแบบไดนามิกพร้อมจำนวนรายการจริง
         // ==========================================================================================
         function computeModuleTotal(mod) {
-            const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
+            const role = getEffectiveRole(mod.sessionRoleKey);
             const docs = queueDataByModule[mod.key] || [];
             // 🔒 นับเฉพาะ stage ที่ role นี้มีสิทธิ์อนุมัติจริงเท่านั้น (Admin ครอบคลุมอยู่แล้ว เพราะทุก canAct เช็ค role==='1' ด้วย)
             return mod.stages.reduce((sum, stage) => {
@@ -1467,7 +1515,7 @@
 
             // 🔒 แสดง tab เฉพาะระบบที่ role นี้มีสิทธิ์อนุมัติอย่างน้อย 1 stage (Admin ผ่านเงื่อนไขนี้เสมอ)
             const visibleModules = APPROVAL_MODULES.filter(mod => {
-                const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
+                const role = getEffectiveRole(mod.sessionRoleKey);
                 return mod.stages.some(stage => stage.canAct(role));
             });
 
@@ -1566,7 +1614,7 @@
             let hasAnyPermission = false;
 
             container.innerHTML = APPROVAL_MODULES.map((mod, modIdx) => {
-                const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
+                const role = getEffectiveRole(mod.sessionRoleKey);
                 const docs = queueDataByModule[mod.key] || [];
                 const themeAccent = ACCENT_MAP[mod.themeColor] || ACCENT_MAP.amber;
 
@@ -2860,13 +2908,14 @@
             lucide.createIcons();
         }
 
-        window.onload = function () {
+        window.onload = async function () {
             if (typeof renderSidebar === 'function') renderSidebar();
             const mobileSidebarContainer = document.getElementById('mobile-sidebar-content');
             const sidebarContainer = document.getElementById('sidebar-container');
             if (mobileSidebarContainer && sidebarContainer) {
                 mobileSidebarContainer.innerHTML = sidebarContainer.innerHTML;
             }
+            await ensureRolesLoaded();
             fetchAllQueues().then(() => {
                 // มาจากปุ่ม "ตรวจสอบ" ในหน้า Main (?system=ncr|swap|disassembly|claim) → เปิดแท็บของระบบนั้นเลย
                 const sys = new URLSearchParams(window.location.search).get('system');
@@ -2928,7 +2977,7 @@
                 return;
             }
 
-            const role = sessionStorage.getItem(foundMod.sessionRoleKey) || '0';
+            const role = getEffectiveRole(foundMod.sessionRoleKey);
             const canAct = stage.canAct(role);
 
             if (canAct) {
