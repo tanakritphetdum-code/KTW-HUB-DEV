@@ -12,14 +12,15 @@
 
         const banner = document.createElement('div');
         banner.id = 'ktw-dev-banner';
-        banner.className = 'w-full bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs sm:text-sm font-medium py-1.5 px-4 text-center shadow-md flex items-center justify-center gap-2 select-none relative z-50';
+        // ใช้ position: fixed เพื่อให้ลอยอยู่ด้านบนสุดตรงกลางจอ โดยไม่ไปรบกวน Flex Layout ของหน้าเว็บ
+        banner.className = 'fixed top-2.5 left-1/2 -translate-x-1/2 z-[99999] bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-semibold py-1 px-4 rounded-full shadow-lg border border-white/30 flex items-center gap-2 select-none pointer-events-none backdrop-blur-sm';
         banner.innerHTML = `
-            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-white/20 uppercase tracking-wider">DEV ENVIRONMENT</span>
-            <span>🛠️ โหมดทดสอบ (DEV) — บันทึกข้อมูลลงตารางทดสอบเท่านั้น ไม่ส่งผลต่อระบบงานจริง</span>
-            ${window.KTW_CONFIG.IS_NETLIFY ? '<span class="text-[11px] bg-black/20 px-2 py-0.5 rounded">Netlify Cloud Staging</span>' : ''}
+            <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+            <span class="uppercase tracking-wider font-bold text-[10px] bg-black/20 px-1.5 py-0.5 rounded">DEV</span>
+            <span>🛠️ โหมดทดสอบ — ข้อมูลไม่ส่งผลต่อระบบงานจริง</span>
         `;
 
-        document.body.prepend(banner);
+        document.body.appendChild(banner);
     }
 
     if (document.readyState === 'loading') {
