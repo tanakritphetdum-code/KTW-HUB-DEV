@@ -216,9 +216,13 @@
                     <td class="py-3 px-3 whitespace-nowrap">${statusBadge}</td>
                     <td class="py-3 px-4 text-center whitespace-nowrap">
                         <div class="inline-flex items-center gap-1 opacity-90 group-hover:opacity-100">
-                            <button onclick="viewDocumentDetail('${doc.docId}')" title="ดูรายละเอียดและประวัติ"
+                            <button onclick="viewDocumentDetail('${doc.docId}')" title="ดูรายละเอียดคำขอ"
                                 class="p-1.5 rounded-lg text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all">
                                 <i data-lucide="eye" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="viewDocflowHistory('${doc.docId}')" title="ดูประวัติ Docflow (สายการอนุมัติ)"
+                                class="p-1.5 rounded-lg text-slate-600 hover:text-purple-600 hover:bg-purple-50 transition-all">
+                                <i data-lucide="git-fork" class="w-4 h-4"></i>
                             </button>
                             <button onclick="printDocument('${doc.docId}')" title="พิมพ์เอกสาร"
                                 class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
@@ -490,37 +494,229 @@
                 </div>
             </div>
 
-            <!-- Timeline Flow -->
+            <!-- Docflow Switch Callout Banner -->
+            <div class="p-4 bg-purple-50/80 rounded-2xl border border-purple-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                        <i data-lucide="git-fork" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <strong class="font-bold text-slate-800 block text-xs">สายการอนุมัติและประวัติการดำเนินงาน (Docflow)</strong>
+                        <span class="text-purple-700 text-[11px]">คลิกดูประวัติการอนุมัติ, ขั้นตอนปัจจุบัน, ความคิดเห็น และไทม์ไลน์แบบละเอียด</span>
+                    </div>
+                </div>
+                <button type="button" onclick="closeDetailModal(); viewDocflowHistory('${doc.docId}');"
+                    class="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-xs active:scale-95 transition-all shrink-0">
+                    <i data-lucide="git-fork" class="w-3.5 h-3.5"></i>
+                    <span>เปิดดูประวัติ Docflow</span>
+                </button>
+            </div>
+        `;
+
+        document.getElementById('detailModal').classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
+    };
+
+    window.closeDetailModal = function() {
+        const m = document.getElementById('detailModal');
+        if (m) m.classList.add('hidden');
+    };
+
+    window.closeDocflowModal = function() {
+        const m = document.getElementById('docflowModal');
+        if (m) m.classList.add('hidden');
+    };
+
+    // ===================================================================
+    // ดูประวัติ Docflow / สายการอนุมัติ (Docflow History & Approval Chain)
+    // ===================================================================
+    window.viewDocflowHistory = function(docId) {
+        const doc = allDocuments.find(d => d.docId === docId);
+        if (!doc) return;
+
+        document.getElementById('docflow-doc-id').textContent = doc.docId;
+        document.getElementById('docflow-doc-title').textContent = doc.title;
+
+        const isSpecialPromo = doc.docType === 'PROMOTION_SPECIAL';
+        const badgeEl = document.getElementById('docflow-case-badge');
+        if (badgeEl) {
+            badgeEl.className = `px-2 py-0.5 rounded-full text-[10px] font-semibold ${isSpecialPromo ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`;
+            badgeEl.textContent = isSpecialPromo ? 'กรณีที่ 1: Promotion พิเศษ (BA ก่อน)' : 'กรณีที่ 2: Price Sheet / ทั่วไป (SCM ก่อน)';
+        }
+
+        const body = document.getElementById('docflow-modal-body');
+        if (!body) return;
+
+        let step2Status = 'PENDING';
+        let step3Status = 'WAITING';
+        let step4Status = 'WAITING';
+
+        if (doc.status === 'PENDING_EXEC') {
+            step2Status = 'CURRENT';
+        } else if (doc.status === 'PENDING_BA' || doc.status === 'PENDING_SCM') {
+            step2Status = 'DONE';
+            step3Status = 'CURRENT';
+        } else if (doc.status === 'COMPLETED') {
+            step2Status = 'DONE';
+            step3Status = 'DONE';
+            step4Status = 'DONE';
+        } else if (doc.status === 'REJECTED') {
+            step2Status = 'REJECTED';
+        }
+
+        const stepBadgeClass = (s) => {
+            if (s === 'DONE') return 'bg-emerald-500 text-white border-emerald-500 shadow-xs';
+            if (s === 'CURRENT') return 'bg-purple-600 text-white border-purple-600 ring-4 ring-purple-100 animate-pulse shadow-xs';
+            if (s === 'REJECTED') return 'bg-rose-500 text-white border-rose-500 shadow-xs';
+            return 'bg-slate-100 text-slate-400 border-slate-200';
+        };
+
+        const step3Label = isSpecialPromo ? 'ทีม BA' : 'ทีม SCM';
+        const step4Label = isSpecialPromo ? 'ทีม SCM' : 'ทีม BA';
+
+        body.innerHTML = `
+            <!-- Current Status Overview -->
+            <div class="p-4 bg-slate-50/80 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="space-y-1">
+                    <span class="text-slate-400 text-[10px] block font-medium">สถานะเอกสารปัจจุบัน</span>
+                    <div class="flex items-center gap-2">
+                        ${getStatusBadge(doc.status)}
+                        <span class="text-slate-700 font-semibold text-xs">ผู้อนุมัติ: <strong class="text-slate-900">${doc.approverName || '-'}</strong></span>
+                    </div>
+                </div>
+                <div class="text-left sm:text-right">
+                    <span class="text-slate-400 text-[10px] block">วันที่ออกคำขอ</span>
+                    <strong class="text-slate-800 text-xs">${formatThaiDate(doc.docDate)}</strong>
+                </div>
+            </div>
+
+            <!-- Visual Stepper Bar -->
+            <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs text-purple-700">
+                        <i data-lucide="git-fork" class="w-4 h-4 text-purple-600"></i>
+                        ขั้นตอนสายการอนุมัติ (${isSpecialPromo ? 'สายที่ 1: BA ตรวจสอบก่อน' : 'สายที่ 2: SCM ตรวจสอบก่อน'})
+                    </h4>
+                    <span class="text-[10px] text-slate-400 font-mono">${doc.docId}</span>
+                </div>
+
+                <div class="grid grid-cols-4 gap-2 pt-2 relative">
+                    <!-- Step 1 -->
+                    <div class="flex flex-col items-center text-center space-y-1.5">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${stepBadgeClass('DONE')}">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                        </div>
+                        <div class="space-y-0.5">
+                            <span class="font-bold text-[11px] text-slate-800 block">Step 1: การตลาด</span>
+                            <span class="text-[10px] text-slate-500 block truncate max-w-[120px]">${doc.createdByName || 'ผู้จัดทำ'}</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="flex flex-col items-center text-center space-y-1.5">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${stepBadgeClass(step2Status)}">
+                            ${step2Status === 'DONE' ? '<i data-lucide="check" class="w-4 h-4"></i>' : (step2Status === 'REJECTED' ? '<i data-lucide="x" class="w-4 h-4"></i>' : '2')}
+                        </div>
+                        <div class="space-y-0.5">
+                            <span class="font-bold text-[11px] text-slate-800 block">Step 2: ผู้บริหาร</span>
+                            <span class="text-[10px] text-slate-500 block truncate max-w-[120px]">${doc.execName ? doc.execName.replace('คุณ', '') : '-'}</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex flex-col items-center text-center space-y-1.5">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${stepBadgeClass(step3Status)}">
+                            ${step3Status === 'DONE' ? '<i data-lucide="check" class="w-4 h-4"></i>' : '3'}
+                        </div>
+                        <div class="space-y-0.5">
+                            <span class="font-bold text-[11px] text-slate-800 block">Step 3: ${step3Label}</span>
+                            <span class="text-[10px] text-slate-500 block truncate max-w-[120px]">${isSpecialPromo ? (doc.baName ? doc.baName.replace('คุณ', '') : 'BA') : (doc.scmName ? doc.scmName.replace('คุณ', '') : 'SCM')}</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 4 -->
+                    <div class="flex flex-col items-center text-center space-y-1.5">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border ${stepBadgeClass(doc.status === 'COMPLETED' ? 'DONE' : 'WAITING')}">
+                            ${doc.status === 'COMPLETED' ? '<i data-lucide="check" class="w-4 h-4"></i>' : '4'}
+                        </div>
+                        <div class="space-y-0.5">
+                            <span class="font-bold text-[11px] text-slate-800 block">${doc.status === 'COMPLETED' ? 'เสร็จสิ้น' : `Step 4: ${step4Label}`}</span>
+                            <span class="text-[10px] text-slate-500 block truncate max-w-[120px]">${doc.status === 'COMPLETED' ? 'จบกระบวนการ' : 'ส่งต่อ (ถ้ามี)'}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline Audit Trail -->
             <div class="space-y-3">
                 <h4 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                    <i data-lucide="git-branch" class="w-4 h-4 text-emerald-500"></i>
-                    ประวัติและไทม์ไลน์การดำเนินงาน (Workflow Timeline)
+                    <i data-lucide="history" class="w-4 h-4 text-purple-600"></i>
+                    บันทึกประวัติและผลการพิจารณา (Audit Trail & Timeline)
                 </h4>
-                <div class="space-y-3 pl-2">
+                <div class="space-y-2.5 pl-2">
                     ${(doc.timeline || []).map((tl, i) => `
                         <div class="flex items-start gap-3 relative">
-                            ${i < (doc.timeline.length - 1) ? '<div class="absolute left-3.5 top-6 bottom-0 w-0.5 bg-slate-200"></div>' : ''}
-                            <div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 ${
-                                tl.status === 'DONE' ? 'bg-emerald-500 text-white shadow-xs' :
-                                tl.status === 'REJECTED' ? 'bg-rose-500 text-white shadow-xs' : 'bg-slate-200 text-slate-500'
+                            ${i < (doc.timeline.length - 1) ? '<div class="absolute left-3 top-5 bottom-0 w-0.5 bg-slate-200"></div>' : ''}
+                            <div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 text-xs shadow-2xs ${
+                                tl.status === 'DONE' ? 'bg-emerald-500 text-white' :
+                                tl.status === 'REJECTED' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-500'
                             }">
                                 <i data-lucide="${tl.status === 'DONE' ? 'check' : tl.status === 'REJECTED' ? 'x' : 'clock'}" class="w-3.5 h-3.5"></i>
                             </div>
-                            <div class="flex-1 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                            <div class="flex-1 bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs">
                                 <div class="flex items-center justify-between">
-                                    <strong class="text-xs text-slate-800">${tl.step}</strong>
-                                    <span class="text-[10px] text-slate-400">${tl.time}</span>
+                                    <strong class="text-xs text-slate-800 font-semibold">${tl.step}</strong>
+                                    <span class="text-[10px] text-slate-400 font-medium">${tl.time}</span>
                                 </div>
-                                <p class="text-[11px] text-slate-600 mt-0.5">การกระทำ: <span class="font-semibold text-slate-800">${tl.action}</span> โดย ${tl.by}</p>
-                                ${tl.comment ? `<div class="mt-1.5 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-600 border border-slate-100">💬 Comment: ${escapeHtml(tl.comment)}</div>` : ''}
+                                <div class="text-[11px] text-slate-600 mt-1 flex flex-wrap items-center gap-x-2">
+                                    <span>การกระทำ: <span class="font-bold text-slate-800">${tl.action}</span></span>
+                                    <span class="text-slate-300">|</span>
+                                    <span>โดย: <span class="text-slate-700">${tl.by || '-'}</span></span>
+                                </div>
+                                ${tl.comment ? `
+                                    <div class="mt-2 p-2.5 bg-slate-50 rounded-xl text-[11px] text-slate-700 border border-slate-200/80">
+                                        <div class="flex items-start gap-1.5">
+                                            <i data-lucide="message-square" class="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5"></i>
+                                            <div>
+                                                <strong class="font-semibold text-slate-500 block text-[10px]">ความคิดเห็น / เหตุผล (Comment):</strong>
+                                                <span class="text-slate-800">${escapeHtml(tl.comment)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ` : ''}
                             </div>
                         </div>
                     `).join('')}
                 </div>
             </div>
+
+            <!-- Stakeholders Grid -->
+            <div class="p-4 bg-slate-50/70 rounded-2xl border border-slate-200 space-y-2">
+                <h4 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
+                    ผู้มีอำนาจอนุมัติตามสายงานของเอกสารนี้
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+                    <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                        <span class="text-slate-400 block text-[10px]">Step 2: ผู้บริหาร</span>
+                        <strong class="text-purple-700 block">${doc.execName || '-'}</strong>
+                        <span class="text-slate-400 text-[10px]">${doc.execEmail || '-'}</span>
+                    </div>
+                    <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                        <span class="text-slate-400 block text-[10px]">ทีม BA</span>
+                        <strong class="text-indigo-700 block">${doc.baName || '-'}</strong>
+                        <span class="text-slate-400 text-[10px]">${doc.baEmail || '-'}</span>
+                    </div>
+                    <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                        <span class="text-slate-400 block text-[10px]">ทีม SCM</span>
+                        <strong class="text-blue-700 block">${doc.scmName || '-'}</strong>
+                        <span class="text-slate-400 text-[10px]">${doc.scmEmail || '-'}</span>
+                    </div>
+                </div>
+            </div>
         `;
 
-        document.getElementById('detailModal').classList.remove('hidden');
+        document.getElementById('docflowModal').classList.remove('hidden');
         if (window.lucide) window.lucide.createIcons();
     };
 
