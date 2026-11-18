@@ -112,6 +112,24 @@ const SYSTEM_MODULES = [
         isAdmin: (role) => role === '1',
         canApprove: () => false,
         nav: { file: 'pettycash.html', icon: 'wallet', label: 'บันทึกเงินสดย่อย' }
+    },
+    {
+        key: 'price_promotion',
+        permKey: 'PRC',
+        sessionRoleKey: 'price_promotion_role',
+        name: 'สร้างใบราคา/โปรโมชั่น',
+        desc: 'ขออนุมัติจัดทำใบราคา, Set BOM และโปรโมชั่น (KTW-9695)',
+        roleLabels: {
+            '0': 'พนักงานทั่วไป (Staff)',
+            '1': 'ผู้ดูแลระบบ (Admin)',
+            '2': 'ผู้บริหาร (Executive Approver)',
+            '3': 'เจ้าหน้าที่ดูแลสินค้า (การตลาด)',
+            '4': 'ทีม BA (Business Analyst)',
+            '5': 'ทีม SCM (Supply Chain Management)'
+        },
+        isAdmin: (role) => role === '1',
+        canApprove: (role) => ['1', '2', '4', '5'].includes(role),
+        nav: { file: 'price_promotion.html', icon: 'badge-percent', label: 'ขออนุมัติสร้างใบราคา/โปรโมชั่น' }
     }
 ];
 
@@ -158,7 +176,7 @@ function renderSidebar() {
     const moduleNavHTML = SYSTEM_MODULES
         .filter(mod => {
             const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
-            if (permOn) return P.can(mod.permKey, 'VIEW_MENU');
+            if (permOn && P.known(mod.permKey, 'VIEW_MENU')) return P.can(mod.permKey, 'VIEW_MENU');
             return !mod.navVisibleRoles || mod.navVisibleRoles.includes(role);
         })
         .map(mod => {

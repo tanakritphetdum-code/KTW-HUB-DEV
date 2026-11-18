@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ขออนุมัติสร้างใบราคา/โปรโมชั่น — KTW HUB</title>
+    <!-- Fonts & Tailwind CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        if (!sessionStorage.getItem('emp_id')) {
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                sessionStorage.setItem('emp_id', '13125');
+                sessionStorage.setItem('name', 'ผู้ดูแลระบบ');
+                sessionStorage.setItem('email', 'admin@ktw.co.th');
+                sessionStorage.setItem('emp_type', '1');
+                sessionStorage.setItem('price_promotion_role', '1');
+                sessionStorage.setItem('disassembly_role', '1');
+                sessionStorage.setItem('ncr_role', '1');
+                sessionStorage.setItem('claim_role', '1');
+                sessionStorage.setItem('borrow_role', '1');
+            } else {
+                window.location.href = '../index.html';
+            }
+        }
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#fff7ed', 100: '#ffedd5', 500: '#f97316', 600: '#ea580c', 700: '#c2410c' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col md:flex-row antialiased">
+
+    <!-- Desktop Sidebar -->
+    <aside id="sidebar-container" class="hidden md:block h-screen sticky top-0 shrink-0"></aside>
+
+    <!-- Mobile Header -->
+    <header class="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 py-3 sticky top-0 z-50">
+        <div class="flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 overflow-hidden">
+                <span class="text-white font-black text-[9px] tracking-tighter">KTW</span>
+            </div>
+            <div>
+                <span class="text-xs font-bold text-slate-800 block">KTW HUB</span>
+                <span class="text-[9px] text-slate-400">ใบราคา/โปรโมชั่น</span>
+            </div>
+        </div>
+        <button id="mobileMenuBtn" onclick="toggleMobileSidebar()" class="p-2 text-slate-600 hover:text-slate-900 rounded-lg">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+    </header>
+
+    <!-- Mobile Sidebar Drawer -->
+    <div id="mobile-sidebar" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs md:hidden" onclick="toggleMobileSidebar()">
+        <div class="w-64 bg-white h-full shadow-2xl p-4 flex flex-col justify-between" onclick="event.stopPropagation()">
+            <div id="mobile-sidebar-content"></div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 min-w-0 bg-slate-50 min-h-screen flex flex-col">
+        <div class="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
+
+            <!-- Page Title Bar (From Image 2) -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-200 flex items-center justify-center text-orange-600 shadow-xs">
+                        <i data-lucide="file-plus-2" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">การจัดการเอกสารสร้างใบราคา/โปรโมชั่น</h1>
+                        <p class="text-xs sm:text-sm text-slate-500">สร้าง ตรวจสอบ และติดตามสถานะแบบฟอร์มใบราคา/โปรโมชั่น</p>
+                    </div>
+                </div>
+                <button onclick="openCreateModal()"
+                    class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 shadow-md shadow-orange-500/20 active:scale-95 transition-all">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>สร้างใบราคา/โปรโมชั่น</span>
+                </button>
+            </div>
+
+            <!-- Filters Section (From Image 2) -->
+            <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <!-- Search -->
+                    <div class="lg:col-span-1">
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">ค้นหาเอกสาร</label>
+                        <div class="relative">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                            <input type="text" id="filter-search" oninput="applyFilters()"
+                                placeholder="ค้นหาชื่อใบราคา/โปรโมชั่น, สินค้ายี่ห้อ, รหัสพนักงาน..."
+                                class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Status Filter -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">สถานะ</label>
+                        <select id="filter-status" onchange="applyFilters()"
+                            class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all">
+                            <option value="ALL">ทั้งหมด</option>
+                            <option value="PENDING_EXEC">รอผู้บริหารอนุมัติ</option>
+                            <option value="PENDING_BA">รอ BA อนุมัติ</option>
+                            <option value="PENDING_SCM">รอ SCM อนุมัติ</option>
+                            <option value="COMPLETED">เสร็จสิ้น</option>
+                            <option value="REJECTED">ตีกลับให้แก้ไข</option>
+                            <option value="CANCELLED">ยกเลิก</option>
+                        </select>
+                    </div>
+
+                    <!-- Brand Filter -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">สินค้ายี่ห้อ</label>
+                        <select id="filter-brand" onchange="applyFilters()"
+                            class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all">
+                            <option value="ALL">ทั้งหมด</option>
+                            <option value="MAKITA">MAKITA</option>
+                            <option value="MAKTEC">MAKTEC</option>
+                            <option value="POLO (SPRAYER)">POLO (SPRAYER)</option>
+                            <option value="POLO">POLO</option>
+                            <option value="JASIC">JASIC</option>
+                            <option value="REX">REX</option>
+                        </select>
+                    </div>
+
+                    <!-- Hierarchy Filter -->
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-500 mb-1">Product hierarchy</label>
+                        <select id="filter-hierarchy" onchange="applyFilters()"
+                            class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all">
+                            <option value="ALL">ทั้งหมด</option>
+                            <option value="M0100">M0100</option>
+                            <option value="P1100">P1100</option>
+                            <option value="J0100">J0100</option>
+                            <option value="R0100">R0100</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Range & Refresh -->
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1">
+                            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ช่วงวันที่ออกเอกสาร</label>
+                            <div class="relative">
+                                <i data-lucide="calendar" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                                <input type="date" id="filter-date" onchange="applyFilters()"
+                                    class="w-full pl-9 pr-2 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white transition-all">
+                            </div>
+                        </div>
+                        <button onclick="fetchPricePromotionList()" title="อัปเดตข้อมูล"
+                            class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-all shadow-xs shrink-0">
+                            <i data-lucide="refresh-cw" id="sync-icon" class="w-3.5 h-3.5"></i>
+                            <span class="hidden sm:inline">อัปเดต</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Container (From Image 2) -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[11px] tracking-wider">
+                                <th class="py-3 px-4">วันที่ออกเอกสาร</th>
+                                <th class="py-3 px-3">สินค้ายี่ห้อ</th>
+                                <th class="py-3 px-3">Product hierarchy</th>
+                                <th class="py-3 px-4">ชื่อใบราคา/โปรโมชั่น</th>
+                                <th class="py-3 px-3">วันที่เริ่มใช้งาน</th>
+                                <th class="py-3 px-3">วันหมดอายุ</th>
+                                <th class="py-3 px-3">รหัสพนักงาน</th>
+                                <th class="py-3 px-3">ผู้อนุมัติ</th>
+                                <th class="py-3 px-3">สถานะ</th>
+                                <th class="py-3 px-4 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="document-table-body" class="divide-y divide-slate-100 text-slate-700 font-normal">
+                            <!-- Rows rendered by pricePromotionService.js -->
+                            <tr>
+                                <td colspan="10" class="text-center py-8 text-slate-400">
+                                    <div class="flex flex-col items-center gap-2">
+                                        <i data-lucide="loader-2" class="w-6 h-6 animate-spin text-orange-500"></i>
+                                        <span>กำลังโหลดข้อมูลเอกสาร...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Table Footer / Count -->
+                <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                    <span id="record-count-text">แสดง 0 รายการ</span>
+                    <span id="last-sync-time" class="text-[11px] text-slate-400">อัปเดตล่าสุด: -</span>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- =================================================================== -->
+    <!-- MODAL: สร้างคำขออนุมัติสร้างใบราคา/โปรโมชั่น (From Image 1) -->
+    <!-- =================================================================== -->
+    <div id="createModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-slate-200 bg-gradient-to-r from-orange-50/50 via-white to-white flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center shadow-sm">
+                        <i data-lucide="file-plus" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base sm:text-lg font-bold text-slate-900">สร้างคำขออนุมัติสร้างใบราคา/โปรโมชั่น</h2>
+                        <p class="text-xs text-slate-500">แบบฟอร์มสำหรับขออนุมัติการจัดทำใบราคาและโปรโมชั่น</p>
+                    </div>
+                </div>
+                <button onclick="closeCreateModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100 transition-all">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <form id="pricePromotionForm" onsubmit="handleFormSubmit(event)" class="overflow-y-auto p-5 sm:p-6 space-y-6 flex-1 text-xs">
+                
+                <!-- SECTION 1: รายละเอียดคำขอ -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 pb-1 border-b border-orange-200">
+                        <span class="w-2 h-4 rounded-full bg-orange-500"></span>
+                        <h3 class="text-sm font-bold text-slate-800">รายละเอียดคำขอ</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันที่ออกเอกสาร <span class="text-red-500">*</span></label>
+                            <input type="date" id="doc_date" required
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">สินค้ายี่ห้อ <span class="text-red-500">*</span></label>
+                            <input type="text" id="brand" required placeholder="กรอกชื่อสินค้ายี่ห้อ"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Product Hierarchy (ยี่ห้อใน SAP) <span class="text-red-500">*</span></label>
+                            <select id="product_hierarchy" required
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                                <option value="">เลือก Product Hierarchy</option>
+                                <option value="M0100">M0100 — MAKITA</option>
+                                <option value="P1100">P1100 — POLO (SPRAYER)</option>
+                                <option value="J0100">J0100 — JASIC</option>
+                                <option value="R0100">R0100 — REX</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">จำนวนหน้า <span class="text-red-500">*</span></label>
+                            <input type="number" id="page_count" min="1" value="1" required
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="sm:col-span-3">
+                            <label class="block font-semibold text-slate-700 mb-1">ชื่อใบราคา/โปรโมชั่น <span class="text-red-500">*</span></label>
+                            <input type="text" id="title" required placeholder="กรอกชื่อใบราคา / โปรโมชั่น เช่น promotion แถมเสื้อ, Price Sheet 2026"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันที่เริ่มใช้งาน <span class="text-red-500">*</span></label>
+                            <input type="date" id="start_date" required
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                        </div>
+
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">วันหมดอายุ <span class="text-red-500">*</span></label>
+                            <input type="date" id="end_date"
+                                class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:bg-white">
+                        </div>
+
+                        <div class="flex items-center pt-5">
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <input type="checkbox" id="no_expiry" onchange="toggleNoExpiry(this)" class="w-4 h-4 rounded text-orange-500 focus:ring-orange-400">
+                                <span class="text-xs text-slate-700 font-medium">จนกว่าจะประกาศยกเลิก หรือโดนทดแทน</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Checklist 7 Questions -->
+                    <div class="bg-slate-50/80 rounded-2xl p-4 border border-slate-200 space-y-4">
+                        <p class="font-bold text-slate-800 text-xs">โปรดตรวจสอบใบราคาหรือโปรโมชั่นที่ท่านจัดทำและเช็ครายละเอียดในใบโปรโมชั่นครบถ้วนตามนี้หรือไม่ ?</p>
+
+                        <!-- Q1: ประเภทใบราคา -->
+                        <div class="space-y-2">
+                            <label class="block font-semibold text-slate-700">1. ประเภทใบราคา <span class="text-red-500">*</span></label>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-orange-300">
+                                    <input type="radio" name="doc_type" value="PRICE_SHEET" checked onchange="handleDocTypeChange()" class="text-orange-500 focus:ring-orange-400">
+                                    <span>Price Sheet (ทั่วไป)</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-orange-300">
+                                    <input type="radio" name="doc_type" value="PROMOTION_GENERAL" onchange="handleDocTypeChange()" class="text-orange-500 focus:ring-orange-400">
+                                    <span>Promotion (ทั่วไป)</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-orange-300 bg-orange-50/40 cursor-pointer hover:border-orange-400">
+                                    <input type="radio" name="doc_type" value="PROMOTION_SPECIAL" onchange="handleDocTypeChange()" class="text-orange-500 focus:ring-orange-400">
+                                    <span class="font-semibold text-orange-800">Promotion (คละรุ่น/ครบมูลค่า/โปรซ้อน)</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-orange-300">
+                                    <input type="radio" name="doc_type" value="SET_BOM" onchange="handleDocTypeChange()" class="text-orange-500 focus:ring-orange-400">
+                                    <span>SET-BOM</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-orange-300">
+                                    <input type="radio" name="doc_type" value="NEW" onchange="handleDocTypeChange()" class="text-orange-500 focus:ring-orange-400">
+                                    <span>ออกใหม่</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-slate-200 cursor-pointer hover:border-orange-300">
+                                    <input type="radio" name="doc_type" value="RENEW" onchange="handleDocTypeChange()" class="text-orange-500 focus:ring-orange-400">
+                                    <span>ต่ออายุ</span>
+                                </label>
+                            </div>
+                            <div class="pt-1">
+                                <label class="inline-flex items-center gap-2">
+                                    <input type="checkbox" id="replace_old" onchange="toggleReplaceOld(this)" class="w-4 h-4 rounded text-orange-500">
+                                    <span>แทนของเดิมแนบ+ ระบุชื่อโปรเดิม:</span>
+                                </label>
+                                <input type="text" id="old_promo_name" disabled placeholder="ระบุชื่อโปรเดิม..."
+                                    class="mt-1 w-full sm:w-1/2 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs disabled:opacity-50">
+                            </div>
+                        </div>
+
+                        <!-- Q2: โปรโมชั่นเกิน 4 ชื่อ -->
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700">2. โปรโมชั่นเกิน 4 ชื่อต่อ 1 material <span class="text-red-500">*</span></label>
+                            <div class="flex items-center gap-4">
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="promo_names_over4" value="NO" checked class="text-orange-500">
+                                    <span>ไม่เกิน</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="promo_names_over4" value="YES" class="text-orange-500">
+                                    <span>เกิน (โปรดพิจารณาเหลือไม่เกิน 4)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Q3: ราคาตั้งสินค้า -->
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700">3. ราคาตั้งสินค้า <span class="text-red-500">*</span></label>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="price_change" value="NO" checked onchange="togglePricePage(this)" class="text-orange-500">
+                                    <span>ไม่เปลี่ยน</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="price_change" value="YES" onchange="togglePricePage(this)" class="text-orange-500">
+                                    <span>เปลี่ยนจากเดิม (แก้ไขใน K-catalog หน้าที่:</span>
+                                </label>
+                                <input type="text" id="kcatalog_page" disabled placeholder="หน้าที่..."
+                                    class="w-24 px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs disabled:opacity-50">
+                                <span>)</span>
+                            </div>
+                        </div>
+
+                        <!-- Q4: มีสินค้าใหม่ -->
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700">4. มีสินค้าใหม่ <span class="text-red-500">*</span></label>
+                            <div class="flex flex-wrap items-center gap-4">
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="has_new_product" value="NO" checked onchange="toggleNewProdDetail(this)" class="text-orange-500">
+                                    <span>ไม่มี</span>
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="has_new_product" value="YES" onchange="toggleNewProdDetail(this)" class="text-orange-500">
+                                    <span>มี (ต้องเพิ่มใน K-catalog) ระบุรายละเอียด:</span>
+                                </label>
+                                <input type="text" id="new_prod_detail" disabled placeholder="ระบุรายละเอียดสินค้าใหม่..."
+                                    class="flex-1 min-w-[200px] px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs disabled:opacity-50">
+                            </div>
+                        </div>
+
+                        <!-- Q5: ขนาดไฟล์ -->
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700">5. ขนาดไฟล์ใบราคา/โปรโมชั่น <span class="text-red-500">*</span></label>
+                            <div class="flex items-center gap-2">
+                                <span>ขนาดไฟล์ไม่เกิน</span>
+                                <input type="number" id="file_size_mb" value="10" min="1" max="100" class="w-20 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs">
+                                <span>MB</span>
+                            </div>
+                        </div>
+
+                        <!-- Q6: Path File -->
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700">6. Path File ของใบราคา <span class="text-red-500">*</span></label>
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <input type="radio" name="file_delivery" value="PATH" checked onchange="toggleDeliveryType(this)" class="text-orange-500">
+                                    <span>ระบุ Path:</span>
+                                    <input type="text" id="file_path" placeholder="เช่น \\ktserver\marketing\price_2026..."
+                                        class="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="radio" name="file_delivery" value="EMAIL" onchange="toggleDeliveryType(this)" class="text-orange-500">
+                                    <span>ส่งทาง Email: วันที่ส่ง Email</span>
+                                    <input type="date" id="email_sent_date" disabled class="px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs disabled:opacity-50">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Q7: จำนวนสำเนา -->
+                        <div class="space-y-1">
+                            <label class="block font-semibold text-slate-700">7. จำนวนใบราคา/โปรโมชั่นที่ต้องสำเนาเป็นแพคต่างๆ <span class="text-red-500">*</span></label>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="print_copy" value="PRINT" checked onchange="togglePrintInputs(this)" class="text-orange-500">
+                                    <span>ปริ้นส์จำนวน</span>
+                                </label>
+                                <input type="number" id="print_qty" value="0" min="0" class="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs">
+                                <span>แผ่น ขาว-ดำ</span>
+                                <input type="number" id="print_bw_qty" value="0" min="0" class="w-16 px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs">
+                                <span>แผ่น</span>
+                                <label class="inline-flex items-center gap-1.5 ml-4 cursor-pointer">
+                                    <input type="radio" name="print_copy" value="NO_PRINT" onchange="togglePrintInputs(this)" class="text-orange-500">
+                                    <span>ไม่ต้องปริ้นแจก</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: เอกสารแนบ (From Image 1) -->
+                <div class="space-y-3">
+                    <div class="flex items-center gap-2 pb-1 border-b border-orange-200">
+                        <span class="w-2 h-4 rounded-full bg-orange-500"></span>
+                        <h3 class="text-sm font-bold text-slate-800">เอกสารแนบ</h3>
+                    </div>
+
+                    <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+                        <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0"></i>
+                        <span><strong>หมายเหตุ :</strong> โปรโมชั่นที่กำหนดเฉพาะบางรหัสสินค้า ต้องแนบไฟล์ Excel รหัสสินค้าทุกครั้ง</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Dropzone 1: Promotion ใหม่ -->
+                        <div class="border-2 border-dashed border-orange-300 rounded-2xl p-4 bg-orange-50/20 text-center hover:bg-orange-50/40 transition-all cursor-pointer"
+                            onclick="document.getElementById('file_new_promo').click()">
+                            <input type="file" id="file_new_promo" class="hidden" accept=".pdf,.xls,.xlsx" onchange="handleFileSelect(this, 'new_promo_preview')">
+                            <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-orange-100 text-orange-600 mb-2">
+                                <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-xs flex items-center justify-center gap-1">
+                                <i data-lucide="star" class="w-3.5 h-3.5 text-orange-500"></i>
+                                Promotion ใหม่
+                            </h4>
+                            <p class="text-[11px] text-slate-500 mt-1">วางไฟล์ที่นี่ หรือ คลิกเพื่อเลือกไฟล์</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">รองรับไฟล์ PDF หรือ Excel เท่านั้น</p>
+                            <div id="new_promo_preview" class="text-xs text-orange-700 font-semibold mt-2 hidden"></div>
+                        </div>
+
+                        <!-- Dropzone 2: Promotion เก่ายกเลิก -->
+                        <div class="border-2 border-dashed border-slate-300 rounded-2xl p-4 bg-slate-50 text-center hover:bg-slate-100 transition-all cursor-pointer"
+                            onclick="document.getElementById('file_old_promo').click()">
+                            <input type="file" id="file_old_promo" class="hidden" accept=".pdf,.xls,.xlsx" onchange="handleFileSelect(this, 'old_promo_preview')">
+                            <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-slate-200 text-slate-600 mb-2">
+                                <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+                            </div>
+                            <h4 class="font-bold text-slate-800 text-xs flex items-center justify-center gap-1">
+                                <i data-lucide="x-circle" class="w-3.5 h-3.5 text-slate-500"></i>
+                                Promotion เก่าที่ยกเลิก
+                            </h4>
+                            <p class="text-[11px] text-slate-500 mt-1">วางไฟล์ที่นี่ หรือ คลิกเพื่อเลือกไฟล์</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">รองรับไฟล์ PDF หรือ Excel เท่านั้น</p>
+                            <div id="old_promo_preview" class="text-xs text-slate-700 font-semibold mt-2 hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: ข้อมูลผู้เกี่ยวข้องกับเอกสาร (From Image 1) -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 pb-1 border-b border-orange-200">
+                        <span class="w-2 h-4 rounded-full bg-orange-500"></span>
+                        <h3 class="text-sm font-bold text-slate-800">ข้อมูลผู้เกี่ยวข้องกับเอกสาร</h3>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Stakeholder 1: การตลาด -->
+                        <div class="p-3.5 bg-orange-50/50 rounded-2xl border border-orange-200 space-y-2">
+                            <span class="font-bold text-orange-700 flex items-center gap-1.5 text-xs">
+                                <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                                ผู้ขออนุมัติ จนท.ผู้ดูแลสินค้า *
+                            </span>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">ชื่อ-นามสกุล *</label>
+                                <input type="text" id="mkt_name" required readonly
+                                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">Email *</label>
+                                <input type="email" id="mkt_email" required readonly
+                                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium">
+                            </div>
+                        </div>
+
+                        <!-- Stakeholder 2: ผู้บริหาร -->
+                        <div class="p-3.5 bg-blue-50/50 rounded-2xl border border-blue-200 space-y-2">
+                            <span class="font-bold text-blue-700 flex items-center gap-1.5 text-xs">
+                                <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                                ผู้บริหาร (เลือก 1 ท่าน) *
+                            </span>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">เลือกผู้บริหาร *</label>
+                                <select id="exec_select" required onchange="handleExecChange(this)"
+                                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium">
+                                    <option value="">เลือกผู้บริหาร</option>
+                                    <option value="EKKAPHON@KTW.CO.TH" data-name="คุณเอกพล ไววิทย์ลิขิต">คุณเอกพล ไววิทย์ลิขิต</option>
+                                    <option value="KAMOLCHAI@KTW.CO.TH" data-name="คุณกมลชัย ไววิทย์ลิขิต">คุณกมลชัย ไววิทย์ลิขิต</option>
+                                    <option value="THITIPONG@KTW.CO.TH" data-name="คุณธิติพงศ์ ไววิทย์ลิขิต">คุณธิติพงศ์ ไววิทย์ลิขิต</option>
+                                    <option value="THANARUJ@KTW.CO.TH" data-name="คุณธนรุจ ไววิทย์ลิขิต">คุณธนรุจ ไววิทย์ลิขิต</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">Email แจ้งเตือน</label>
+                                <input type="email" id="exec_email" readonly placeholder="อีเมลจะแสดงอัตโนมัติ"
+                                    class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+
+                        <!-- Stakeholder 3: BA -->
+                        <div class="p-3.5 bg-purple-50/50 rounded-2xl border border-purple-200 space-y-2">
+                            <span class="font-bold text-purple-700 flex items-center gap-1.5 text-xs">
+                                <i data-lucide="users" class="w-3.5 h-3.5"></i>
+                                เจ้าหน้าที่ แผนก BA *
+                            </span>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">เลือกเจ้าหน้าที่ BA *</label>
+                                <select id="ba_select" required onchange="handleBaChange(this)"
+                                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium">
+                                    <option value="">เลือกเจ้าหน้าที่ BA</option>
+                                    <option value="BA@KTW.CO.TH" data-name="คุณนภาพร ประสิทธิเม">คุณนภาพร ประสิทธิเม</option>
+                                    <option value="BA@KTW.CO.TH" data-name="คุณกรกนก แซ่เจีย">คุณกรกนก แซ่เจีย</option>
+                                    <option value="BA@KTW.CO.TH" data-name="คุณภูริชญา เทียนไชย">คุณภูริชญา เทียนไชย</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">Email แจ้งเตือน</label>
+                                <input type="email" id="ba_email" value="BA@KTW.CO.TH" readonly
+                                    class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+
+                        <!-- Stakeholder 4: SCM -->
+                        <div class="p-3.5 bg-sky-50/50 rounded-2xl border border-sky-200 space-y-2">
+                            <span class="font-bold text-sky-700 flex items-center gap-1.5 text-xs">
+                                <i data-lucide="truck" class="w-3.5 h-3.5"></i>
+                                เจ้าหน้าที่ แผนก SCM *
+                            </span>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">เลือกเจ้าหน้าที่ SCM *</label>
+                                <select id="scm_select" required onchange="handleScmChange(this)"
+                                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium">
+                                    <option value="">เลือกเจ้าหน้าที่ SCM</option>
+                                    <option value="ARCHARA@KTW.CO.TH" data-name="คุณอัจฉรา ธาราชีพ">คุณอัจฉรา ธาราชีพ</option>
+                                    <option value="KHEMJIRA@KTW.CO.TH" data-name="คุณเขมจิรา รักสมยา">คุณเขมจิรา รักสมยา</option>
+                                    <option value="SIRILAK_SCM@KTW.CO.TH" data-name="คุณศิริลักษณ์ สืบสิงห์">คุณศิริลักษณ์ สืบสิงห์</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500 mb-0.5">Email แจ้งเตือน</label>
+                                <input type="email" id="scm_email" readonly placeholder="อีเมลจะแสดงอัตโนมัติ"
+                                    class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="pt-4 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
+                    <button type="button" onclick="closeCreateModal()"
+                        class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold text-xs transition-all">
+                        ยกเลิก
+                    </button>
+                    <button type="submit" id="btn-save-request"
+                        class="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 active:scale-95 transition-all flex items-center gap-2">
+                        <i data-lucide="check" class="w-4 h-4"></i>
+                        <span>บันทึกคำขอ</span>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MODAL: รายละเอียดเอกสาร & ไทม์ไลน์สถานะ (Detail & Timeline Modal) -->
+    <!-- =================================================================== -->
+    <div id="detailModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                    <span id="detail-doc-id" class="text-xs font-mono text-orange-600 font-bold block">-</span>
+                    <h3 id="detail-doc-title" class="text-base font-bold text-slate-800">รายละเอียดคำขอใบราคา/โปรโมชั่น</h3>
+                </div>
+                <button onclick="closeDetailModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-xl hover:bg-slate-100">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div id="detail-modal-body" class="p-6 overflow-y-auto space-y-6 text-xs text-slate-700 flex-1">
+                <!-- Dynamically populated by service -->
+            </div>
+            <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end">
+                <button onclick="closeDetailModal()" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs">
+                    ปิด
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Scripts -->
+    <script src="../version.js"></script>
+    <script src="../shared/config.js"></script>
+    <script src="../shared/devBanner.js"></script>
+    <script src="../shared/api.js"></script>
+    <script src="../shared/perm.js"></script>
+    <script src="../shared/menu.js"></script>
+
+    <!-- Page Specific Service Logic -->
+    <script src="../modules/pricePromotionService.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.lucide) window.lucide.createIcons();
+            if (typeof renderSidebar === 'function') renderSidebar();
+            
+            const mobileSidebarContainer = document.getElementById('mobile-sidebar-content');
+            const sidebarContainer = document.getElementById('sidebar-container');
+            if (mobileSidebarContainer && sidebarContainer) {
+                mobileSidebarContainer.innerHTML = sidebarContainer.innerHTML;
+            }
+
+            // ตั้งค่าเริ่มต้นวันที่
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('doc_date');
+            const startInput = document.getElementById('start_date');
+            if (dateInput) dateInput.value = today;
+            if (startInput) startInput.value = today;
+
+            // เติมข้อมูลผู้ยื่นคำขอ (การตลาด)
+            const mktName = document.getElementById('mkt_name');
+            const mktEmail = document.getElementById('mkt_email');
+            if (mktName) mktName.value = sessionStorage.getItem('name') || 'ธนกฤษฎ์ เพชรดำ';
+            if (mktEmail) mktEmail.value = sessionStorage.getItem('email') || 'tanakrit@ktw.co.th';
+
+            // เริ่มโหลดข้อมูลเอกสาร
+            if (window.initPricePromotionService) {
+                window.initPricePromotionService();
+            }
+        });
+
+        function toggleMobileSidebar() {
+            const drawer = document.getElementById('mobile-sidebar');
+            drawer.classList.toggle('hidden');
+        }
+
+        function toggleNoExpiry(cb) {
+            const endInput = document.getElementById('end_date');
+            if (endInput) {
+                endInput.disabled = cb.checked;
+                if (cb.checked) endInput.value = '';
+            }
+        }
+
+        function toggleReplaceOld(cb) {
+            const txt = document.getElementById('old_promo_name');
+            if (txt) {
+                txt.disabled = !cb.checked;
+                if (cb.checked) txt.focus();
+            }
+        }
+
+        function togglePricePage(r) {
+            const txt = document.getElementById('kcatalog_page');
+            if (txt) {
+                txt.disabled = (r.value !== 'YES');
+                if (r.value === 'YES') txt.focus();
+            }
+        }
+
+        function toggleNewProdDetail(r) {
+            const txt = document.getElementById('new_prod_detail');
+            if (txt) {
+                txt.disabled = (r.value !== 'YES');
+                if (r.value === 'YES') txt.focus();
+            }
+        }
+
+        function toggleDeliveryType(r) {
+            const pathTxt = document.getElementById('file_path');
+            const emailDate = document.getElementById('email_sent_date');
+            if (r.value === 'PATH') {
+                pathTxt.disabled = false;
+                emailDate.disabled = true;
+            } else {
+                pathTxt.disabled = true;
+                emailDate.disabled = false;
+            }
+        }
+
+        function togglePrintInputs(r) {
+            const q1 = document.getElementById('print_qty');
+            const q2 = document.getElementById('print_bw_qty');
+            const disabled = (r.value === 'NO_PRINT');
+            if (q1) q1.disabled = disabled;
+            if (q2) q2.disabled = disabled;
+        }
+
+        function handleExecChange(sel) {
+            const emailInput = document.getElementById('exec_email');
+            if (emailInput) emailInput.value = sel.value;
+        }
+
+        function handleBaChange(sel) {
+            const emailInput = document.getElementById('ba_email');
+            if (emailInput) emailInput.value = sel.value;
+        }
+
+        function handleScmChange(sel) {
+            const emailInput = document.getElementById('scm_email');
+            if (emailInput) emailInput.value = sel.value;
+        }
+
+        function handleFileSelect(input, previewId) {
+            const preview = document.getElementById(previewId);
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                preview.textContent = `ไฟล์ที่เลือก: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                preview.classList.remove('hidden');
+            } else {
+                preview.textContent = '';
+                preview.classList.add('hidden');
+            }
+        }
+
+        function openCreateModal() {
+            document.getElementById('createModal').classList.remove('hidden');
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').classList.add('hidden');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detailModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

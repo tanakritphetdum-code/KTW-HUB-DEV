@@ -120,7 +120,7 @@
             // 1. การ์ดระบบย่อยทั้งหมด
             const availableModules = window.SYSTEM_MODULES.filter(mod => {
                 const role = sessionStorage.getItem(mod.sessionRoleKey) || '0';
-                if (permOn) return P.can(mod.permKey, 'VIEW_MENU');
+                if (permOn && P.known(mod.permKey, 'VIEW_MENU')) return P.can(mod.permKey, 'VIEW_MENU');
                 return !mod.navVisibleRoles || mod.navVisibleRoles.includes(role);
             });
 

@@ -26,6 +26,7 @@
                 if (!sessionStorage.getItem('ncr_role') || sessionStorage.getItem('ncr_role') === '0') sessionStorage.setItem('ncr_role', '1');
                 if (!sessionStorage.getItem('claim_role') || sessionStorage.getItem('claim_role') === '0') sessionStorage.setItem('claim_role', '1');
                 if (!sessionStorage.getItem('borrow_role') || sessionStorage.getItem('borrow_role') === '0') sessionStorage.setItem('borrow_role', '1');
+                if (!sessionStorage.getItem('price_promotion_role') || sessionStorage.getItem('price_promotion_role') === '0') sessionStorage.setItem('price_promotion_role', '1');
             }
 
             if (!currentEmp) return;
@@ -62,6 +63,7 @@
             emerald: { dot: 'bg-emerald-500', border: 'border-emerald-500', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-700', badgeBorder: 'border-emerald-200' },
             blue:    { dot: 'bg-blue-500',    border: 'border-blue-500',    badgeBg: 'bg-blue-50',    badgeText: 'text-blue-700',    badgeBorder: 'border-blue-200' },
             indigo:  { dot: 'bg-indigo-500',  border: 'border-indigo-500',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-700',  badgeBorder: 'border-indigo-200' },
+            purple:  { dot: 'bg-purple-500',  border: 'border-purple-500',  badgeBg: 'bg-purple-50',  badgeText: 'text-purple-700',  badgeBorder: 'border-purple-200' },
             rose:    { dot: 'bg-rose-500',    border: 'border-rose-500',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-700',    badgeBorder: 'border-rose-200' }
         };
 
@@ -1080,6 +1082,86 @@
                             { label: 'วันที่คืนสินค้า', render: d => formatThaiDate(d.dueDate) }
                         ],
                         renderActions: d => window.brwApproveActions ? window.brwApproveActions(d) : ''
+                    }
+                ]
+            }
+            ,{
+                key: 'price_promotion',
+                custom: true,
+                label: 'ขออนุมัติสร้างใบราคา/โปรโมชั่น (Price Sheet / Promotion)',
+                description: 'อนุมัติ/ตรวจสอบเอกสารใบราคาและโปรโมชั่นตามสายการอนุมัติ (ผู้บริหาร, BA, SCM)',
+                icon: 'badge-percent',
+                themeColor: 'purple',
+                sessionRoleKey: 'price_promotion_role',
+                getDocId: d => d.docId,
+                isCancelled: d => d.status === 'CANCELLED' || d.status === 'REJECTED',
+                fetchQueue: async () => {
+                    if (window.prcFetchQueue) return window.prcFetchQueue();
+                    try {
+                        const raw = localStorage.getItem('KTW_PRICE_PROMOTION_DOCS');
+                        if (raw) {
+                            const docs = JSON.parse(raw);
+                            return docs.filter(d => ['PENDING_EXEC', 'PENDING_BA', 'PENDING_SCM'].includes(d.status));
+                        }
+                    } catch (e) {
+                        console.warn(e);
+                    }
+                    return [];
+                },
+                stages: [
+                    {
+                        key: 'exec',
+                        label: 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร) รอตรวจสอบและลงชื่ออนุมัติ',
+                        accentColor: 'purple',
+                        rejectEndpoint: null,
+                        recipientKeys: ['execEmail', 'execName'],
+                        canAct: role => ['1', '2'].includes(role),
+                        matchDoc: d => d.status === 'PENDING_EXEC',
+                        columns: [
+                            { label: 'เลขที่เอกสาร', render: d => `<button type="button" onclick="prcOpenApprovalModal('${d.docId}')" class="font-mono font-semibold text-slate-800 hover:underline hover:text-purple-600">${d.docId}</button>` },
+                            { label: 'วันที่เอกสาร', render: d => formatThaiDate(d.docDate) },
+                            { label: 'ประเภท/ชื่อใบราคา', render: d => `<div class="font-medium text-slate-900">${d.title}</div><div class="text-[10px] text-slate-400">${d.docType}</div>` },
+                            { label: 'ยี่ห้อ / Hierarchy', render: d => `${d.brand || '-'} (${d.productHierarchy || '-'})` },
+                            { label: 'ผู้จัดทำ (การตลาด)', render: d => `${d.createdByName || '-'} (${d.empId || '-'})` },
+                            { label: 'ผู้บริหารที่เลือก', render: d => `<span class="font-semibold text-purple-700">${d.execName || '-'}</span>` }
+                        ],
+                        renderActions: d => `<button type="button" onclick="prcOpenApprovalModal('${d.docId}')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 shadow-xs active:scale-95"><i data-lucide="file-signature" class="w-3.5 h-3.5"></i> ตรวจสอบ/เซ็น</button>`
+                    },
+                    {
+                        key: 'ba',
+                        label: 'ทีม BA รอตรวจสอบและอนุมัติ',
+                        accentColor: 'indigo',
+                        rejectEndpoint: null,
+                        recipientKeys: ['baEmail', 'baName'],
+                        canAct: role => ['1', '3', '4'].includes(role),
+                        matchDoc: d => d.status === 'PENDING_BA',
+                        columns: [
+                            { label: 'เลขที่เอกสาร', render: d => `<button type="button" onclick="prcOpenApprovalModal('${d.docId}')" class="font-mono font-semibold text-slate-800 hover:underline hover:text-indigo-600">${d.docId}</button>` },
+                            { label: 'วันที่เอกสาร', render: d => formatThaiDate(d.docDate) },
+                            { label: 'ประเภท/ชื่อใบราคา', render: d => `<div class="font-medium text-slate-900">${d.title}</div><div class="text-[10px] text-slate-400">${d.docType}</div>` },
+                            { label: 'ยี่ห้อ / Hierarchy', render: d => `${d.brand || '-'} (${d.productHierarchy || '-'})` },
+                            { label: 'ผู้จัดทำ (การตลาด)', render: d => `${d.createdByName || '-'} (${d.empId || '-'})` },
+                            { label: 'เจ้าหน้าที่ BA', render: d => `<span class="font-semibold text-indigo-700">${d.baName || '-'}</span>` }
+                        ],
+                        renderActions: d => `<button type="button" onclick="prcOpenApprovalModal('${d.docId}')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs active:scale-95"><i data-lucide="file-signature" class="w-3.5 h-3.5"></i> ตรวจสอบ/เซ็น</button>`
+                    },
+                    {
+                        key: 'scm',
+                        label: 'ทีม SCM รอตรวจสอบและอนุมัติ',
+                        accentColor: 'blue',
+                        rejectEndpoint: null,
+                        recipientKeys: ['scmEmail', 'scmName'],
+                        canAct: role => ['1', '4', '5'].includes(role),
+                        matchDoc: d => d.status === 'PENDING_SCM',
+                        columns: [
+                            { label: 'เลขที่เอกสาร', render: d => `<button type="button" onclick="prcOpenApprovalModal('${d.docId}')" class="font-mono font-semibold text-slate-800 hover:underline hover:text-blue-600">${d.docId}</button>` },
+                            { label: 'วันที่เอกสาร', render: d => formatThaiDate(d.docDate) },
+                            { label: 'ประเภท/ชื่อใบราคา', render: d => `<div class="font-medium text-slate-900">${d.title}</div><div class="text-[10px] text-slate-400">${d.docType}</div>` },
+                            { label: 'ยี่ห้อ / Hierarchy', render: d => `${d.brand || '-'} (${d.productHierarchy || '-'})` },
+                            { label: 'ผู้จัดทำ (การตลาด)', render: d => `${d.createdByName || '-'} (${d.empId || '-'})` },
+                            { label: 'เจ้าหน้าที่ SCM', render: d => `<span class="font-semibold text-blue-700">${d.scmName || '-'}</span>` }
+                        ],
+                        renderActions: d => `<button type="button" onclick="prcOpenApprovalModal('${d.docId}')" class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs active:scale-95"><i data-lucide="file-signature" class="w-3.5 h-3.5"></i> ตรวจสอบ/เซ็น</button>`
                     }
                 ]
             }
@@ -2949,6 +3031,13 @@
                 return;
             }
 
+            // Price Promotion: เปิดหน้ารายละเอียดเอกสาร (พร้อมปุ่มอนุมัติ/ปฏิเสธ/ส่งต่อ)
+            if (moduleKey === 'price_promotion') {
+                if (window.prcOpenApprovalModal) await window.prcOpenApprovalModal(docId);
+                cleanUrlParams();
+                return;
+            }
+
             const candidateModules = moduleKey ? [getModule(moduleKey)].filter(Boolean) : APPROVAL_MODULES.filter(m => !m.custom);
 
             let foundMod = null;
@@ -3145,4 +3234,403 @@
             act.innerHTML = h;
         };
         window.detailPhotosAt = n => detailPhotos[n] || '';
+
+        // ===================================================================
+        // ระบบขออนุมัติสร้างใบราคา/โปรโมชั่น (Price Sheet / Promotion System)
+        // KTW-9695: จัดการคำขอ, ตรวจสอบ, อนุมัติ, ส่งต่อ และตีกลับ
+        // ===================================================================
+        const PRC_STORAGE_KEY = 'KTW_PRICE_PROMOTION_DOCS';
+
+        function prcGetDocs() {
+            try {
+                const raw = localStorage.getItem(PRC_STORAGE_KEY);
+                if (raw) return JSON.parse(raw);
+            } catch (e) {
+                console.warn(e);
+            }
+            return [];
+        }
+
+        function prcSaveDocs(docs) {
+            try {
+                localStorage.setItem(PRC_STORAGE_KEY, JSON.stringify(docs));
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+
+        function prcNowFormatted() {
+            const now = new Date();
+            const d = String(now.getDate()).padStart(2, '0');
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const y = now.getFullYear() + 543;
+            const h = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            return `${d}/${m}/${y} ${h}:${min} น.`;
+        }
+
+        window.prcCloseModal = function () {
+            const m = document.getElementById('prcApprovalModal');
+            if (m) m.remove();
+        };
+
+        window.prcOpenApprovalModal = function (docId) {
+            window.prcCloseModal();
+            const docs = prcGetDocs();
+            const doc = docs.find(d => d.docId === docId);
+            if (!doc) {
+                showNotification('ไม่พบเอกสาร', `ไม่พบเอกสาร ${docId} ในระบบ`, 'warning');
+                return;
+            }
+
+            const m = document.createElement('div');
+            m.id = 'prcApprovalModal';
+            m.className = 'fixed inset-0 z-[9990] flex items-center justify-center bg-slate-900/60 p-4';
+
+            const startFmt = formatThaiDate(doc.startDate);
+            const endFmt = doc.noExpiry ? 'จนกว่าจะประกาศยกเลิก' : (doc.endDate === '9999-12-31' ? 'ไม่มีกำหนด' : formatThaiDate(doc.endDate));
+            const isSpecialPromo = doc.docType === 'PROMOTION_SPECIAL';
+
+            // Header & Body & Actions
+            let actionsHtml = '';
+
+            if (doc.status === 'PENDING_EXEC') {
+                actionsHtml = `
+                    <button type="button" onclick="prcActionExec('${doc.docId}', true)" class="h-10 px-5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-95 transition-all">
+                        <i data-lucide="check" class="w-4 h-4 inline mr-1"></i> อนุมัติคำขอ ${isSpecialPromo ? '(ส่งต่อ BA)' : '(ส่งต่อ SCM)'}
+                    </button>
+                    <button type="button" onclick="prcPromptReject('${doc.docId}', 'ผู้บริหาร')" class="h-10 px-4 rounded-xl text-sm font-semibold border border-rose-300 text-rose-600 hover:bg-rose-50 transition-all">
+                        <i data-lucide="x" class="w-4 h-4 inline mr-1"></i> ไม่อนุมัติ (ตีกลับการตลาด)
+                    </button>
+                `;
+            } else if (doc.status === 'PENDING_BA') {
+                if (isSpecialPromo) {
+                    // กรณีที่ 1: BA ตรวจสอบก่อน
+                    actionsHtml = `
+                        <button type="button" onclick="prcActionBA_Finish('${doc.docId}')" class="h-10 px-5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-95 transition-all">
+                            <i data-lucide="check-circle-2" class="w-4 h-4 inline mr-1"></i> อนุมัติและจบกระบวนการที่ BA
+                        </button>
+                        <button type="button" onclick="prcPromptForward('${doc.docId}', 'BA', 'SCM')" class="h-10 px-4 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm active:scale-95 transition-all">
+                            <i data-lucide="arrow-right" class="w-4 h-4 inline mr-1"></i> อนุมัติแต่ส่งต่อ SCM
+                        </button>
+                        <button type="button" onclick="prcPromptReject('${doc.docId}', 'BA')" class="h-10 px-4 rounded-xl text-sm font-semibold border border-rose-300 text-rose-600 hover:bg-rose-50 transition-all">
+                            <i data-lucide="x" class="w-4 h-4 inline mr-1"></i> ไม่อนุมัติ (ตีกลับการตลาด)
+                        </button>
+                    `;
+                } else {
+                    // กรณีที่ 2: SCM ส่งต่อมาให้ BA
+                    actionsHtml = `
+                        <button type="button" onclick="prcActionBA_Finish('${doc.docId}')" class="h-10 px-5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-95 transition-all">
+                            <i data-lucide="check-circle-2" class="w-4 h-4 inline mr-1"></i> อนุมัติสิ้นสุดกระบวนการ
+                        </button>
+                        <button type="button" onclick="prcPromptReject('${doc.docId}', 'BA')" class="h-10 px-4 rounded-xl text-sm font-semibold border border-rose-300 text-rose-600 hover:bg-rose-50 transition-all">
+                            <i data-lucide="x" class="w-4 h-4 inline mr-1"></i> ไม่อนุมัติ (ตีกลับการตลาด)
+                        </button>
+                    `;
+                }
+            } else if (doc.status === 'PENDING_SCM') {
+                if (!isSpecialPromo) {
+                    // กรณีที่ 2: SCM ตรวจสอบก่อน
+                    actionsHtml = `
+                        <button type="button" onclick="prcActionSCM_Finish('${doc.docId}')" class="h-10 px-5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-95 transition-all">
+                            <i data-lucide="check-circle-2" class="w-4 h-4 inline mr-1"></i> อนุมัติและจบกระบวนการที่ SCM
+                        </button>
+                        <button type="button" onclick="prcPromptForward('${doc.docId}', 'SCM', 'BA')" class="h-10 px-4 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm active:scale-95 transition-all">
+                            <i data-lucide="arrow-right" class="w-4 h-4 inline mr-1"></i> อนุมัติแต่ส่งต่อ BA
+                        </button>
+                        <button type="button" onclick="prcPromptReject('${doc.docId}', 'SCM')" class="h-10 px-4 rounded-xl text-sm font-semibold border border-rose-300 text-rose-600 hover:bg-rose-50 transition-all">
+                            <i data-lucide="x" class="w-4 h-4 inline mr-1"></i> ไม่อนุมัติ (ตีกลับการตลาด)
+                        </button>
+                    `;
+                } else {
+                    // กรณีที่ 1: BA ส่งต่อมาให้ SCM
+                    actionsHtml = `
+                        <button type="button" onclick="prcActionSCM_Finish('${doc.docId}')" class="h-10 px-5 rounded-xl text-sm font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm active:scale-95 transition-all">
+                            <i data-lucide="check-circle-2" class="w-4 h-4 inline mr-1"></i> อนุมัติสิ้นสุดกระบวนการ
+                        </button>
+                        <button type="button" onclick="prcPromptReject('${doc.docId}', 'SCM')" class="h-10 px-4 rounded-xl text-sm font-semibold border border-rose-300 text-rose-600 hover:bg-rose-50 transition-all">
+                            <i data-lucide="x" class="w-4 h-4 inline mr-1"></i> ไม่อนุมัติ (ตีกลับการตลาด)
+                        </button>
+                    `;
+                }
+            } else {
+                actionsHtml = `<span class="text-xs text-slate-400 mr-auto">เอกสารนี้ได้รับการดำเนินการเสร็จสิ้นแล้ว (${doc.status})</span>`;
+            }
+
+            actionsHtml += `<button type="button" onclick="prcCloseModal()" class="h-10 px-5 rounded-xl text-sm font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all">ปิด</button>`;
+
+            m.innerHTML = `
+                <div class="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+                    <!-- Modal Header -->
+                    <div class="bg-gradient-to-r from-slate-900 via-purple-950 to-slate-900 text-white p-5 flex items-center justify-between shrink-0">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-purple-500/20 flex items-center justify-center border border-purple-400/30">
+                                <i data-lucide="badge-percent" class="w-5 h-5 text-purple-300"></i>
+                            </div>
+                            <div>
+                                <div class="text-[11px] text-purple-300 font-semibold tracking-wide">ขออนุมัติสร้างใบราคา/โปรโมชั่น · KTW-9695</div>
+                                <div class="text-base sm:text-lg font-bold font-mono text-white flex items-center gap-2">
+                                    <span>${doc.docId}</span>
+                                    <span class="text-xs px-2.5 py-0.5 rounded-full font-normal ${isSpecialPromo ? 'bg-orange-500/20 text-orange-300 border border-orange-400/30' : 'bg-blue-500/20 text-blue-300 border border-blue-400/30'}">
+                                        ${isSpecialPromo ? 'กรณีที่ 1: Promotion พิเศษ' : 'กรณีที่ 2: Price Sheet / ทั่วไป'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="prcCloseModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="p-5 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                        <!-- Summary Banner -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+                            <div><span class="text-slate-400 block text-[10px]">วันที่ออกเอกสาร</span><strong class="text-slate-800">${formatThaiDate(doc.docDate)}</strong></div>
+                            <div><span class="text-slate-400 block text-[10px]">สินค้ายี่ห้อ</span><strong class="text-slate-800">${doc.brand || '-'}</strong></div>
+                            <div><span class="text-slate-400 block text-[10px]">Product Hierarchy</span><strong class="text-slate-800 font-mono">${doc.productHierarchy || '-'}</strong></div>
+                            <div><span class="text-slate-400 block text-[10px]">ผู้จัดทำ (การตลาด)</span><strong class="text-slate-800">${doc.createdByName || '-'}</strong></div>
+                            <div class="col-span-2"><span class="text-slate-400 block text-[10px]">ชื่อใบราคา/โปรโมชั่น</span><strong class="text-slate-900 text-sm">${doc.title}</strong></div>
+                            <div class="col-span-2"><span class="text-slate-400 block text-[10px]">ระยะเวลาใช้งาน</span><strong class="text-slate-800">${startFmt} ถึง ${endFmt}</strong></div>
+                        </div>
+
+                        <!-- 7 Checklist Summary -->
+                        <div class="p-4 bg-white rounded-2xl border border-slate-200 space-y-2 text-xs">
+                            <h4 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs text-purple-700">
+                                <i data-lucide="check-square" class="w-4 h-4 text-purple-600"></i> เช็คลิสต์ตรวจสอบความครบถ้วน 7 ข้อ
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-600 text-[11px] pt-1">
+                                <div><strong>1. ประเภท:</strong> ${doc.docType} ${doc.replaceOld ? `(แทนของเดิม: ${doc.oldPromoName || '-'})` : ''}</div>
+                                <div><strong>2. โปรโมชั่นเกิน 4 ชื่อ:</strong> ${doc.promoOver4 === 'YES' ? '<span class="text-amber-600 font-bold">เกิน 4 ชื่อ</span>' : 'ไม่เกิน'}</div>
+                                <div><strong>3. ราคาตั้งสินค้า:</strong> ${doc.priceChange === 'YES' ? `<span class="text-amber-600 font-bold">เปลี่ยนจากเดิม (หน้า K-catalog: ${doc.kcatalogPage || '-'})</span>` : 'ไม่เปลี่ยน'}</div>
+                                <div><strong>4. มีสินค้าใหม่:</strong> ${doc.hasNewProd === 'YES' ? `<span class="text-purple-600 font-bold">มี (${doc.newProdDetail || '-'})</span>` : 'ไม่มี'}</div>
+                                <div><strong>5. ขนาดไฟล์:</strong> ${doc.fileSizeMb || 0} MB (จำนวน ${doc.pageCount || 1} หน้า)</div>
+                                <div><strong>6. การจัดส่ง:</strong> ${doc.fileDelivery === 'PATH' ? `โฟลเดอร์ Server: <code class="font-mono text-[10px] text-purple-700">${doc.filePath || '-'}</code>` : `ส่ง Email (${doc.emailSentDate || '-'})`}</div>
+                                <div class="col-span-2"><strong>7. การทำสำเนา:</strong> ${doc.printCopy === 'PRINT' ? `ปริ้นส์จำนวน ${doc.printQty || 0} แผ่น (ขาว-ดำ ${doc.printBwQty || 0} แผ่น)` : 'ไม่ต้องปริ้นแจก'}</div>
+                            </div>
+                        </div>
+
+                        <!-- Stakeholders -->
+                        <div class="p-4 bg-slate-50/70 rounded-2xl border border-slate-200">
+                            <h4 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs mb-2">
+                                <i data-lucide="users" class="w-4 h-4 text-slate-500"></i> ผู้เกี่ยวข้องในกระบวนการ
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px]">
+                                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                                    <span class="text-slate-400 block text-[10px]">ผู้บริหาร (Step 2)</span>
+                                    <strong class="text-purple-700 block">${doc.execName || '-'}</strong>
+                                    <span class="text-slate-400 text-[10px]">${doc.execEmail || '-'}</span>
+                                </div>
+                                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                                    <span class="text-slate-400 block text-[10px]">ทีม BA</span>
+                                    <strong class="text-indigo-700 block">${doc.baName || '-'}</strong>
+                                    <span class="text-slate-400 text-[10px]">${doc.baEmail || '-'}</span>
+                                </div>
+                                <div class="p-2.5 bg-white rounded-xl border border-slate-200">
+                                    <span class="text-slate-400 block text-[10px]">ทีม SCM</span>
+                                    <strong class="text-blue-700 block">${doc.scmName || '-'}</strong>
+                                    <span class="text-slate-400 text-[10px]">${doc.scmEmail || '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timeline History -->
+                        <div class="space-y-3 pt-2">
+                            <h4 class="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                                <i data-lucide="git-branch" class="w-4 h-4 text-emerald-500"></i> ไทม์ไลน์การดำเนินงาน (Timeline)
+                            </h4>
+                            <div class="space-y-2.5 pl-2">
+                                ${(doc.timeline || []).map((tl, i) => `
+                                    <div class="flex items-start gap-3 relative">
+                                        ${i < (doc.timeline.length - 1) ? '<div class="absolute left-3 top-5 bottom-0 w-0.5 bg-slate-200"></div>' : ''}
+                                        <div class="w-6 h-6 rounded-full flex items-center justify-center shrink-0 z-10 text-xs ${
+                                            tl.status === 'DONE' ? 'bg-emerald-500 text-white' :
+                                            tl.status === 'REJECTED' ? 'bg-rose-500 text-white' : 'bg-slate-200 text-slate-500'
+                                        }">
+                                            <i data-lucide="${tl.status === 'DONE' ? 'check' : tl.status === 'REJECTED' ? 'x' : 'clock'}" class="w-3 h-3"></i>
+                                        </div>
+                                        <div class="flex-1 bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <strong class="text-slate-800">${tl.step}</strong>
+                                                <span class="text-[10px] text-slate-400">${tl.time}</span>
+                                            </div>
+                                            <p class="text-[11px] text-slate-600 mt-0.5">การกระทำ: <span class="font-semibold text-slate-800">${tl.action}</span> โดย ${tl.by || '-'}</p>
+                                            ${tl.comment ? `<div class="mt-1 p-2 bg-slate-50 rounded-lg text-[10px] text-slate-600 border border-slate-100">💬 <strong>Comment:</strong> ${tl.comment}</div>` : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Actions Footer -->
+                    <div class="p-4 border-t border-slate-200 bg-slate-50/70 flex flex-wrap justify-end items-center gap-2 shrink-0">
+                        ${actionsHtml}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(m);
+            m.addEventListener('click', ev => { if (ev.target === m) window.prcCloseModal(); });
+            if (window.lucide) lucide.createIcons();
+        };
+
+        // 1. ผู้บริหารอนุมัติ (Step 2)
+        window.prcActionExec = function (docId, approved) {
+            const docs = prcGetDocs();
+            const doc = docs.find(d => d.docId === docId);
+            if (!doc) return;
+
+            const curUser = sessionStorage.getItem('name') || doc.execName || 'ผู้บริหาร';
+            const curEmp = sessionStorage.getItem('emp_id') || '';
+            const isSpecialPromo = doc.docType === 'PROMOTION_SPECIAL';
+
+            if (isSpecialPromo) {
+                // กรณีที่ 1: ส่งต่อให้ทีม BA
+                doc.status = 'PENDING_BA';
+                doc.approverName = doc.baName;
+                doc.timeline.push({
+                    step: 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร)',
+                    action: 'อนุมัติคำขอ และส่งต่อไปยังทีม BA',
+                    by: `${curUser} (${curEmp || 'ผู้บริหาร'})`,
+                    time: prcNowFormatted(),
+                    status: 'DONE',
+                    comment: 'ผู้บริหารตรวจสอบและอนุมัติคำขอเรียบร้อยแล้ว ส่งต่อให้ทีม BA ตรวจสอบ'
+                });
+            } else {
+                // กรณีที่ 2: ส่งต่อให้ทีม SCM
+                doc.status = 'PENDING_SCM';
+                doc.approverName = doc.scmName;
+                doc.timeline.push({
+                    step: 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร)',
+                    action: 'อนุมัติคำขอ และส่งต่อไปยังทีม SCM',
+                    by: `${curUser} (${curEmp || 'ผู้บริหาร'})`,
+                    time: prcNowFormatted(),
+                    status: 'DONE',
+                    comment: 'ผู้บริหารตรวจสอบและอนุมัติคำขอเรียบร้อยแล้ว ส่งต่อให้ทีม SCM ตรวจสอบ'
+                });
+            }
+
+            prcSaveDocs(docs);
+            window.prcCloseModal();
+            showNotification('อนุมัติสำเร็จ', `อนุมัติคำขอ ${docId} เรียบร้อยแล้ว ระบบได้ส่งต่อให้ทีมงานขั้นตอนถัดไป`);
+            fetchAllQueues();
+        };
+
+        // 2. BA อนุมัติและจบที่ BA
+        window.prcActionBA_Finish = function (docId) {
+            const docs = prcGetDocs();
+            const doc = docs.find(d => d.docId === docId);
+            if (!doc) return;
+
+            const curUser = sessionStorage.getItem('name') || doc.baName || 'ทีม BA';
+            const curEmp = sessionStorage.getItem('emp_id') || '';
+
+            doc.status = 'COMPLETED';
+            doc.timeline.push({
+                step: 'ทีม BA ตรวจสอบ',
+                action: 'อนุมัติและจบกระบวนการที่ BA (สิ้นสุด)',
+                by: `${curUser} (${curEmp || 'BA'})`,
+                time: prcNowFormatted(),
+                status: 'DONE',
+                comment: 'เจ้าหน้าที่ BA ตรวจสอบเงื่อนไขโปรโมชั่นแล้ว ถูกต้องครบถ้วน สิ้นสุดกระบวนการอนุมัติ'
+            });
+
+            prcSaveDocs(docs);
+            window.prcCloseModal();
+            showNotification('อนุมัติเสร็จสิ้น', `เอกสาร ${docId} ได้รับการอนุมัติสิ้นสุดกระบวนการเรียบร้อยแล้ว`);
+            fetchAllQueues();
+        };
+
+        // 3. SCM อนุมัติและจบที่ SCM
+        window.prcActionSCM_Finish = function (docId) {
+            const docs = prcGetDocs();
+            const doc = docs.find(d => d.docId === docId);
+            if (!doc) return;
+
+            const curUser = sessionStorage.getItem('name') || doc.scmName || 'ทีม SCM';
+            const curEmp = sessionStorage.getItem('emp_id') || '';
+
+            doc.status = 'COMPLETED';
+            doc.timeline.push({
+                step: 'ทีม SCM ตรวจสอบ',
+                action: 'อนุมัติและจบกระบวนการที่ SCM (สิ้นสุด)',
+                by: `${curUser} (${curEmp || 'SCM'})`,
+                time: prcNowFormatted(),
+                status: 'DONE',
+                comment: 'เจ้าหน้าที่ SCM ตรวจสอบข้อมูลใบราคาแล้ว ถูกต้องครบถ้วน สิ้นสุดกระบวนการอนุมัติ'
+            });
+
+            prcSaveDocs(docs);
+            window.prcCloseModal();
+            showNotification('อนุมัติเสร็จสิ้น', `เอกสาร ${docId} ได้รับการอนุมัติสิ้นสุดกระบวนการเรียบร้อยแล้ว`);
+            fetchAllQueues();
+        };
+
+        // 4. ส่งต่อ (Forward with comment)
+        window.prcPromptForward = function (docId, fromTeam, toTeam) {
+            const comment = prompt(`อนุมัติและส่งต่อไปยังทีม ${toTeam}\nกรุณาระบุความคิดเห็น/ข้อความเพิ่มเติม (Comment):`, '');
+            if (comment === null) return; // user cancelled
+
+            const docs = prcGetDocs();
+            const doc = docs.find(d => d.docId === docId);
+            if (!doc) return;
+
+            const curUser = sessionStorage.getItem('name') || `ทีม ${fromTeam}`;
+            const curEmp = sessionStorage.getItem('emp_id') || '';
+
+            if (toTeam === 'SCM') {
+                doc.status = 'PENDING_SCM';
+                doc.approverName = doc.scmName;
+            } else {
+                doc.status = 'PENDING_BA';
+                doc.approverName = doc.baName;
+            }
+
+            doc.timeline.push({
+                step: `ทีม ${fromTeam} ตรวจสอบ`,
+                action: `อนุมัติและส่งต่อให้ทีม ${toTeam}`,
+                by: `${curUser} (${curEmp || fromTeam})`,
+                time: prcNowFormatted(),
+                status: 'DONE',
+                comment: comment.trim() || 'ส่งต่อให้ทีมงานดำเนินการตรวจสอบเพิ่มเติม'
+            });
+
+            prcSaveDocs(docs);
+            window.prcCloseModal();
+            showNotification('ส่งต่อสำเร็จ', `ส่งต่อเอกสาร ${docId} ไปยังทีม ${toTeam} เรียบร้อยแล้ว`);
+            fetchAllQueues();
+        };
+
+        // 5. ไม่อนุมัติ (ตีกลับการตลาด พร้อมระบุ Comment)
+        window.prcPromptReject = function (docId, teamName) {
+            const reason = prompt(`ไม่อนุมัติ / ตีกลับเอกสารไปยัง เจ้าหน้าที่การตลาด\nกรุณาระบุเหตุผลหรือรายละเอียดเพิ่มเติม (จำเป็น):`, '');
+            if (!reason || !reason.trim()) {
+                if (reason !== null) alert('กรุณาระบุเหตุผลในการตีกลับเอกสาร');
+                return;
+            }
+
+            const docs = prcGetDocs();
+            const doc = docs.find(d => d.docId === docId);
+            if (!doc) return;
+
+            const curUser = sessionStorage.getItem('name') || teamName;
+            const curEmp = sessionStorage.getItem('emp_id') || '';
+
+            doc.status = 'REJECTED';
+            doc.approverName = doc.createdByName;
+            doc.timeline.push({
+                step: `${teamName} ตรวจสอบ`,
+                action: 'ไม่อนุมัติ (ตีกลับให้การตลาดแก้ไข)',
+                by: `${curUser} (${curEmp || teamName})`,
+                time: prcNowFormatted(),
+                status: 'REJECTED',
+                comment: reason.trim()
+            });
+
+            prcSaveDocs(docs);
+            window.prcCloseModal();
+            showNotification('ตีกลับสำเร็จ', `ตีกลับเอกสาร ${docId} ไปยังผู้จัดทำเรียบร้อยแล้ว`, 'warning');
+            fetchAllQueues();
+        };
     })();

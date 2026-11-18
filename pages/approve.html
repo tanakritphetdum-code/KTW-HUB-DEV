@@ -11,7 +11,19 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
         if (!sessionStorage.getItem('emp_id')) {
-            window.location.href = '../index.html';
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                sessionStorage.setItem('emp_id', '13125');
+                sessionStorage.setItem('name', 'ผู้ดูแลระบบ');
+                sessionStorage.setItem('email', 'admin@ktw.co.th');
+                sessionStorage.setItem('emp_type', '1');
+                sessionStorage.setItem('price_promotion_role', '1');
+                sessionStorage.setItem('disassembly_role', '1');
+                sessionStorage.setItem('ncr_role', '1');
+                sessionStorage.setItem('claim_role', '1');
+                sessionStorage.setItem('borrow_role', '1');
+            } else {
+                window.location.href = '../index.html';
+            }
         }
         tailwind.config = {
             theme: {
