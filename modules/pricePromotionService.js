@@ -220,6 +220,10 @@
                                 class="p-1.5 rounded-lg text-slate-600 hover:text-orange-600 hover:bg-orange-50 transition-all">
                                 <i data-lucide="eye" class="w-4 h-4"></i>
                             </button>
+                            <button onclick="editDocument('${doc.docId}')" title="แก้ไขเอกสาร"
+                                class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i>
+                            </button>
                             <button onclick="viewDocflowHistory('${doc.docId}')" title="ดูประวัติ Docflow (สายการอนุมัติ)"
                                 class="p-1.5 rounded-lg text-slate-600 hover:text-purple-600 hover:bg-purple-50 transition-all">
                                 <i data-lucide="git-fork" class="w-4 h-4"></i>
@@ -332,7 +336,73 @@
 
             const currentEmpId = sessionStorage.getItem('emp_id') || '13125';
 
-            // สร้าง DocId
+            // ตรวจสอบว่าเป็นโหมดแก้ไขเอกสารเดิมหรือไม่
+            const editDocId = document.getElementById('edit_doc_id')?.value;
+            if (editDocId) {
+                const doc = allDocuments.find(d => d.docId === editDocId);
+                if (doc) {
+                    doc.docDate = docDate;
+                    doc.brand = brand;
+                    doc.productHierarchy = productHierarchy;
+                    doc.pageCount = pageCount;
+                    doc.title = title;
+                    doc.startDate = startDate;
+                    doc.endDate = endDate;
+                    doc.noExpiry = noExpiry;
+                    doc.docType = docType;
+                    doc.replaceOld = replaceOld;
+                    doc.oldPromoName = oldPromoName;
+                    doc.promoOver4 = promoOver4;
+                    doc.priceChange = priceChange;
+                    doc.kcatalogPage = kcatalogPage;
+                    doc.hasNewProd = hasNewProd;
+                    doc.newProdDetail = newProdDetail;
+                    doc.fileSizeMb = fileSizeMb;
+                    doc.fileDelivery = fileDelivery;
+                    doc.filePath = filePath;
+                    doc.emailSentDate = emailSentDate;
+                    doc.printCopy = printCopy;
+                    doc.printQty = printQty;
+                    doc.printBwQty = printBwQty;
+                    doc.execName = execName;
+                    doc.execEmail = execEmail;
+                    doc.baName = baName;
+                    doc.baEmail = baEmail;
+                    doc.scmName = scmName;
+                    doc.scmEmail = scmEmail;
+
+                    const wasRejected = (doc.status === 'REJECTED');
+                    if (wasRejected) {
+                        doc.status = 'PENDING_EXEC';
+                        doc.approverName = execName;
+                    }
+
+                    const now = new Date();
+                    const d = String(now.getDate()).padStart(2, '0');
+                    const m = String(now.getMonth() + 1).padStart(2, '0');
+                    const y = now.getFullYear() + 543;
+                    const h = String(now.getHours()).padStart(2, '0');
+                    const min = String(now.getMinutes()).padStart(2, '0');
+                    const timeFmt = `${d}/${m}/${y} ${h}:${min} น.`;
+
+                    doc.timeline.push({
+                        step: 'แก้ไขเอกสาร',
+                        action: wasRejected ? 'แก้ไขข้อมูลเรียบร้อย และส่งกลับเข้าสู่สายอนุมัติ Step 2 (ผู้บริหาร)' : 'แก้ไขข้อมูลเอกสารสำเร็จ',
+                        by: `${mktName} (${currentEmpId})`,
+                        time: timeFmt,
+                        status: 'DONE',
+                        comment: wasRejected ? 'แก้ไขตามข้อเสนอแนะและส่งให้ผู้บริหารพิจารณาอีกครั้ง' : 'แก้ไขข้อมูลรายละเอียดคำขอ'
+                    });
+
+                    saveLocalDocuments(allDocuments);
+                    window.closeCreateModal();
+                    renderTable();
+                    alert(`บันทึกการแก้ไขเอกสาร ${editDocId} เรียบร้อยแล้ว${wasRejected ? '\nระบบได้ส่งคำขอกลับเข้าสู่ Step 2 ผู้บริหารอีกครั้ง' : ''}`);
+                    return;
+                }
+            }
+
+            // สร้าง DocId ใหม่ (กรณีสร้างใหม่)
             const now = new Date();
             const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
             const seq = String(allDocuments.length + 1).padStart(4, '0');
@@ -841,6 +911,159 @@
             renderTable();
             alert(`ยกเลิกเอกสาร ${docId} เรียบร้อยแล้ว`);
         }
+    };
+
+    // ===================================================================
+    // แก้ไขเอกสาร (Edit Document)
+    // ===================================================================
+    window.editDocument = function(docId) {
+        const doc = allDocuments.find(d => d.docId === docId);
+        if (!doc) return;
+
+        if (doc.status === 'CANCELLED') {
+            alert(`เอกสาร ${docId} ถูกยกเลิกไปแล้ว ไม่สามารถแก้ไขได้`);
+            return;
+        }
+
+        if (doc.status === 'COMPLETED') {
+            if (!confirm(`เอกสาร ${docId} อยู่ในสถานะ "เสร็จสิ้น" แล้ว คุณแน่ใจว่าต้องการแก้ไขข้อมูลใช่หรือไม่?`)) return;
+        }
+
+        const editInput = document.getElementById('edit_doc_id');
+        if (editInput) editInput.value = doc.docId;
+
+        const titleEl = document.getElementById('modal-form-title');
+        const subtitleEl = document.getElementById('modal-form-subtitle');
+        const btnText = document.getElementById('btn-save-text');
+
+        if (titleEl) titleEl.textContent = `แก้ไขเอกสารขออนุมัติสร้างใบราคา/โปรโมชั่น (${doc.docId})`;
+        if (subtitleEl) subtitleEl.textContent = `แก้ไขข้อมูลรายละเอียดคำขอและเช็คลิสต์ 7 ข้อ`;
+        if (btnText) btnText.textContent = 'บันทึกการแก้ไข';
+
+        // Pre-fill form fields
+        const dateInput = document.getElementById('doc_date');
+        if (dateInput) dateInput.value = doc.docDate || '';
+
+        const brandInput = document.getElementById('brand');
+        if (brandInput) brandInput.value = doc.brand || '';
+
+        const hierInput = document.getElementById('product_hierarchy');
+        if (hierInput) hierInput.value = doc.productHierarchy || 'M0100';
+
+        const pageInput = document.getElementById('page_count');
+        if (pageInput) pageInput.value = doc.pageCount || 1;
+
+        const titleInput = document.getElementById('title');
+        if (titleInput) titleInput.value = doc.title || '';
+
+        const startInput = document.getElementById('start_date');
+        if (startInput) startInput.value = doc.startDate || '';
+
+        const noExpCb = document.getElementById('no_expiry');
+        const endInput = document.getElementById('end_date');
+        if (noExpCb) {
+            noExpCb.checked = !!doc.noExpiry;
+            if (endInput) {
+                endInput.disabled = !!doc.noExpiry;
+                endInput.value = (doc.endDate && doc.endDate !== '9999-12-31') ? doc.endDate : '';
+            }
+        }
+
+        // Checkbox & Radio fields
+        const docTypeRadio = document.querySelector(`input[name="doc_type"][value="${doc.docType}"]`);
+        if (docTypeRadio) docTypeRadio.checked = true;
+
+        const replaceOldCb = document.getElementById('replace_old');
+        const oldPromoInput = document.getElementById('old_promo_name');
+        if (replaceOldCb) {
+            replaceOldCb.checked = !!doc.replaceOld;
+            if (oldPromoInput) {
+                oldPromoInput.disabled = !doc.replaceOld;
+                oldPromoInput.value = doc.oldPromoName || '';
+            }
+        }
+
+        const promoOver4 = document.querySelector(`input[name="promo_names_over4"][value="${doc.promoOver4 || 'NO'}"]`);
+        if (promoOver4) promoOver4.checked = true;
+
+        const priceChange = document.querySelector(`input[name="price_change"][value="${doc.priceChange || 'NO'}"]`);
+        if (priceChange) {
+            priceChange.checked = true;
+            const kc = document.getElementById('kcatalog_page');
+            if (kc) {
+                kc.disabled = (doc.priceChange !== 'YES');
+                kc.value = doc.kcatalogPage || '';
+            }
+        }
+
+        const hasNewProd = document.querySelector(`input[name="has_new_product"][value="${doc.hasNewProd || 'NO'}"]`);
+        if (hasNewProd) {
+            hasNewProd.checked = true;
+            const np = document.getElementById('new_prod_detail');
+            if (np) {
+                np.disabled = (doc.hasNewProd !== 'YES');
+                np.value = doc.newProdDetail || '';
+            }
+        }
+
+        const fileSizeInput = document.getElementById('file_size_mb');
+        if (fileSizeInput) fileSizeInput.value = doc.fileSizeMb || 5;
+
+        const fileDeliv = document.querySelector(`input[name="file_delivery"][value="${doc.fileDelivery || 'PATH'}"]`);
+        if (fileDeliv) {
+            fileDeliv.checked = true;
+            const pt = document.getElementById('file_path');
+            const em = document.getElementById('email_sent_date');
+            if (pt) {
+                pt.disabled = (doc.fileDelivery !== 'PATH');
+                pt.value = doc.filePath || '';
+            }
+            if (em) {
+                em.disabled = (doc.fileDelivery === 'PATH');
+                em.value = doc.emailSentDate || '';
+            }
+        }
+
+        const printCopy = document.querySelector(`input[name="print_copy"][value="${doc.printCopy || 'PRINT'}"]`);
+        if (printCopy) {
+            printCopy.checked = true;
+            const pq = document.getElementById('print_qty');
+            const pbw = document.getElementById('print_bw_qty');
+            const dis = (doc.printCopy === 'NO_PRINT');
+            if (pq) { pq.disabled = dis; pq.value = doc.printQty || 0; }
+            if (pbw) { pbw.disabled = dis; pbw.value = doc.printBwQty || 0; }
+        }
+
+        // Stakeholders
+        const mktNameInput = document.getElementById('mkt_name');
+        if (mktNameInput) mktNameInput.value = doc.createdByName || '';
+
+        const mktEmailInput = document.getElementById('mkt_email');
+        if (mktEmailInput) mktEmailInput.value = doc.createdByEmail || '';
+
+        const execSel = document.getElementById('exec_select');
+        if (execSel && doc.execEmail) {
+            execSel.value = doc.execEmail;
+            const exEmailInput = document.getElementById('exec_email');
+            if (exEmailInput) exEmailInput.value = doc.execEmail;
+        }
+
+        const baSel = document.getElementById('ba_select');
+        if (baSel && doc.baEmail) {
+            baSel.value = doc.baEmail;
+            const baEmailInput = document.getElementById('ba_email');
+            if (baEmailInput) baEmailInput.value = doc.baEmail;
+        }
+
+        const scmSel = document.getElementById('scm_select');
+        if (scmSel && doc.scmEmail) {
+            scmSel.value = doc.scmEmail;
+            const scmEmailInput = document.getElementById('scm_email');
+            if (scmEmailInput) scmEmailInput.value = doc.scmEmail;
+        }
+
+        document.getElementById('createModal').classList.remove('hidden');
+        if (window.lucide) window.lucide.createIcons();
     };
 
     window.printDocument = function(docId) {
