@@ -228,10 +228,15 @@
                                 class="p-1.5 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all">
                                 <i data-lucide="printer" class="w-4 h-4"></i>
                             </button>
-                            ${(doc.status === 'REJECTED' || doc.status === 'PENDING_EXEC') ? `
-                            <button onclick="cancelDocument('${doc.docId}')" title="ยกเลิกคำขอ"
-                                class="p-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all">
+                            ${doc.status !== 'CANCELLED' ? `
+                            <button onclick="rollbackDocumentStatus('${doc.docId}')" title="ถอยสถานะ"
+                                class="p-1.5 rounded-lg text-slate-600 hover:text-amber-600 hover:bg-amber-50 transition-all">
                                 <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                            </button>` : ''}
+                            ${doc.status !== 'CANCELLED' ? `
+                            <button onclick="cancelDocument('${doc.docId}')" title="ยกเลิกเอกสาร"
+                                class="p-1.5 rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 transition-all">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>` : ''}
                         </div>
                     </td>
@@ -720,19 +725,117 @@
         if (window.lucide) window.lucide.createIcons();
     };
 
-    // ยกเลิกคำขอ
+    // ===================================================================
+    // ถอยสถานะเอกสาร (Rollback Document Status)
+    // ===================================================================
+    window.rollbackDocumentStatus = function(docId) {
+        const doc = allDocuments.find(d => d.docId === docId);
+        if (!doc) return;
+
+        if (doc.status === 'PENDING_EXEC') {
+            alert(`เอกสาร ${docId} อยู่ในขั้นตอนเริ่มต้น (Step 2: รอผู้บริหารอนุมัติ) แล้ว ไม่สามารถถอยสถานะได้อีก\nหากไม่ต้องการดำเนินการต่อ กรุณาใช้ปุ่ม "ยกเลิกเอกสาร"`);
+            return;
+        }
+
+        const isSpecialPromo = doc.docType === 'PROMOTION_SPECIAL';
+        let prevStatus = 'PENDING_EXEC';
+        let prevApprover = doc.execName;
+        let prevLabel = 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร)';
+
+        if (doc.status === 'COMPLETED') {
+            const lastDone = [...(doc.timeline || [])].reverse().find(t => t.status === 'DONE' && (t.step.includes('BA') || t.step.includes('SCM')));
+            if (lastDone && lastDone.step.includes('SCM')) {
+                prevStatus = 'PENDING_SCM';
+                prevApprover = doc.scmName;
+                prevLabel = 'ทีม SCM ตรวจสอบ';
+            } else if (lastDone && lastDone.step.includes('BA')) {
+                prevStatus = 'PENDING_BA';
+                prevApprover = doc.baName;
+                prevLabel = 'ทีม BA ตรวจสอบ';
+            } else {
+                prevStatus = isSpecialPromo ? 'PENDING_BA' : 'PENDING_SCM';
+                prevApprover = isSpecialPromo ? doc.baName : doc.scmName;
+                prevLabel = isSpecialPromo ? 'ทีม BA ตรวจสอบ' : 'ทีม SCM ตรวจสอบ';
+            }
+        } else if (doc.status === 'PENDING_SCM') {
+            if (isSpecialPromo) {
+                prevStatus = 'PENDING_BA';
+                prevApprover = doc.baName;
+                prevLabel = 'ทีม BA ตรวจสอบ';
+            } else {
+                prevStatus = 'PENDING_EXEC';
+                prevApprover = doc.execName;
+                prevLabel = 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร)';
+            }
+        } else if (doc.status === 'PENDING_BA') {
+            if (isSpecialPromo) {
+                prevStatus = 'PENDING_EXEC';
+                prevApprover = doc.execName;
+                prevLabel = 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร)';
+            } else {
+                prevStatus = 'PENDING_SCM';
+                prevApprover = doc.scmName;
+                prevLabel = 'ทีม SCM ตรวจสอบ';
+            }
+        } else if (doc.status === 'REJECTED' || doc.status === 'CANCELLED') {
+            prevStatus = 'PENDING_EXEC';
+            prevApprover = doc.execName;
+            prevLabel = 'Step 2: ผู้ตรวจเอกสาร (ผู้บริหาร)';
+        }
+
+        const reason = prompt(`ถอยสถานะเอกสาร ${docId}\nต้องการถอยสถานะกลับไป: [${prevLabel}] ใช่หรือไม่?\nกรุณาระบุเหตุผลการถอยสถานะ:`, 'แก้ไขข้อมูล/ส่งตรวจสอบซ้ำ');
+        if (reason === null) return; // กดยกเลิกใน prompt
+
+        const curUser = sessionStorage.getItem('name') || 'ผู้ดูแลระบบ';
+        const curEmp = sessionStorage.getItem('emp_id') || '';
+
+        const now = new Date();
+        const d = String(now.getDate()).padStart(2, '0');
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const y = now.getFullYear() + 543;
+        const h = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const timeFmt = `${d}/${m}/${y} ${h}:${min} น.`;
+
+        doc.status = prevStatus;
+        doc.approverName = prevApprover;
+        doc.timeline.push({
+            step: 'ถอยสถานะเอกสาร',
+            action: `ถอยสถานะกลับไป ${prevLabel}`,
+            by: `${curUser} (${curEmp || 'Admin'})`,
+            time: timeFmt,
+            status: 'PENDING',
+            comment: reason.trim() || 'ย้อนกลับขั้นตอนการอนุมัติ'
+        });
+
+        saveLocalDocuments(allDocuments);
+        renderTable();
+        alert(`ถอยสถานะเอกสาร ${docId} กลับไปยัง [${prevLabel}] เรียบร้อยแล้ว`);
+    };
+
+    // ===================================================================
+    // ยกเลิกเอกสาร
+    // ===================================================================
     window.cancelDocument = function(docId) {
-        if (!confirm(`คุณต้องการยกเลิกคำขอเลขที่ ${docId} ใช่หรือไม่?`)) return;
+        if (!confirm(`คุณต้องการยกเลิกเอกสารเลขที่ ${docId} ใช่หรือไม่?`)) return;
         const doc = allDocuments.find(d => d.docId === docId);
         if (doc) {
+            const now = new Date();
+            const d = String(now.getDate()).padStart(2, '0');
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const y = now.getFullYear() + 543;
+            const h = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            const timeFmt = `${d}/${m}/${y} ${h}:${min} น.`;
+
             doc.status = 'CANCELLED';
             doc.timeline.push({
-                step: 'ยกเลิกคำขอ',
-                action: 'ผู้จัดทำขอยกเลิกคำขอ',
+                step: 'ยกเลิกเอกสาร',
+                action: 'ผู้จัดทำขอยกเลิกเอกสาร',
                 by: sessionStorage.getItem('name') || 'การตลาด',
-                time: new Date().toLocaleString('th-TH'),
+                time: timeFmt,
                 status: 'REJECTED',
-                comment: 'ผู้จัดทำยกเลิกเอกสารนี้'
+                comment: 'ยกเลิกเอกสารนี้'
             });
             saveLocalDocuments(allDocuments);
             renderTable();
